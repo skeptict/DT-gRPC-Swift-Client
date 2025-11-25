@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="DrawThingsKit Logo" width="200"/>
+</p>
+
 # DrawThingsKit
 
 A Swift framework for interacting with Draw Things gRPC server, designed for easy integration with SwiftUI applications on macOS.
