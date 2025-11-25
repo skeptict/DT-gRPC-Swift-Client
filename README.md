@@ -360,8 +360,6 @@ let config = DrawThingsConfiguration(
     height: 576,
     steps: 30,
     model: "svd_xt_1.1.safetensors",
-    fpsId: 8,                    // Frames per second
-    motionBucketId: 127,         // Motion intensity (0-255)
     numFrames: 25                // Number of frames to generate
 )
 
@@ -392,8 +390,6 @@ let config = DrawThingsConfiguration(
     height: 576,
     steps: 30,
     model: "svd_xt_1.1.safetensors",
-    fpsId: 8,
-    motionBucketId: 127,
     numFrames: 25,
     strength: 0.8               // How much to transform the input image
 )
@@ -410,12 +406,6 @@ print("Generated \(frames.count) video frames from input image")
 **Video Generation Parameters:**
 
 - `numFrames`: Number of frames to generate (e.g., 14, 25, 81)
-- `fpsId`: Frames per second for the video (typically 5-30)
-- `motionBucketId`: Motion intensity/scale
-  - Lower values (0-64): Subtle motion
-  - Medium values (65-127): Normal motion
-  - Higher values (128-255): Strong motion
-- `condAug`: Conditioning augmentation (noise) for guiding frames (default: 0.02)
 - `startFrameCfg`: CFG scale for the first frame guidance (default: 1.0)
 
 **Important Notes:**
