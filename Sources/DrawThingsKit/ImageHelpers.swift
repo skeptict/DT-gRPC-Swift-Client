@@ -74,7 +74,7 @@ public struct ImageHelpers {
         let imageFillsCanvas = abs(scaledSize.width - canvasSize.width) < 0.5 &&
                                abs(scaledSize.height - canvasSize.height) < 0.5
 
-        print("🔍 scaleImageToCanvas: image=\(imageSize), canvas=\(canvasSize), scaled=\(scaledSize), fills=\(imageFillsCanvas)")
+        DrawThingsKitLogger.debug("🔍 scaleImageToCanvas: image=\(imageSize), canvas=\(canvasSize), scaled=\(scaledSize), fills=\(imageFillsCanvas)")
 
         // If image fills canvas completely, no need to create new canvas with background
         if imageFillsCanvas {
@@ -82,11 +82,11 @@ public struct ImageHelpers {
             if abs(imageSize.width - canvasSize.width) < 0.5 &&
                abs(imageSize.height - canvasSize.height) < 0.5 {
                 // Already the right size
-                print("✅ Image already correct size, returning original")
+                DrawThingsKitLogger.debug("✅ Image already correct size, returning original")
                 return image
             } else {
                 // Need to resize
-                print("✅ Resizing image without background")
+                DrawThingsKitLogger.debug("✅ Resizing image without background")
                 let resized = NSImage(size: canvasSize)
                 resized.lockFocus()
                 image.draw(in: NSRect(origin: .zero, size: canvasSize))
@@ -95,7 +95,7 @@ public struct ImageHelpers {
             }
         }
 
-        print("⚠️ Image needs letterboxing, adding background")
+        DrawThingsKitLogger.debug("⚠️ Image needs letterboxing, adding background")
 
         // Image doesn't fill canvas - need background
         let canvas = NSImage(size: canvasSize)
@@ -172,14 +172,14 @@ public struct ImageHelpers {
         }
 
         let channels = (hasTransparency && !forceRGB) ? 4 : 3  // RGBA for transparency, RGB otherwise (unless forced)
-        print("🖼️ Converting image: \(width)x\(height), \(channels) channels, hasTransparency: \(hasTransparency), forceRGB: \(forceRGB)")
+        DrawThingsKitLogger.debug("🖼️ Converting image: \(width)x\(height), \(channels) channels, hasTransparency: \(hasTransparency), forceRGB: \(forceRGB)")
 
         // Debug: Check first few pixels (ARGB format)
-        print("🔍 First 16 bytes (4 ARGB pixels): ", terminator: "")
+        var hexBytes = ""
         for i in 0..<min(16, pixelData.count) {
-            print(String(format: "%02x ", pixelData[i]), terminator: "")
+            hexBytes += String(format: "%02x ", pixelData[i])
         }
-        print()
+        DrawThingsKitLogger.debug("First 16 bytes (4 ARGB pixels): \(hexBytes)")
 
         // DTTensor format constants (from ccv_nnc)
         let CCV_TENSOR_CPU_MEMORY: UInt32 = 0x1
@@ -233,7 +233,7 @@ public struct ImageHelpers {
                             let bitPattern = float16Value.bitPattern
                             let byte0 = UInt8(bitPattern & 0xFF)
                             let byte1 = UInt8((bitPattern >> 8) & 0xFF)
-                            print("🔬 Pixel 0 \(channelName): uint8=\(uint8Value) -> float=\(floatValue) -> float16=\(float16Value) -> bytes=[\(String(format: "%02x", byte0)) \(String(format: "%02x", byte1))]")
+                            DrawThingsKitLogger.debug("🔬 Pixel 0 \(channelName): uint8=\(uint8Value) -> float=\(floatValue) -> float16=\(float16Value) -> bytes=[\(String(format: "%02x", byte0)) \(String(format: "%02x", byte1))]")
                             debugPixelCount += 1
                         }
 
@@ -251,11 +251,11 @@ public struct ImageHelpers {
             }
         }
 
-        print("✅ DTTensor created: \(tensorData.count) bytes")
+        DrawThingsKitLogger.debug("✅ DTTensor created: \(tensorData.count) bytes")
 
         // Debug: Print first 100 bytes as hex
         let debugBytes = tensorData.prefix(100).map { String(format: "%02x", $0) }.joined(separator: " ")
-        print("📊 First 100 bytes: \(debugBytes)")
+        DrawThingsKitLogger.debug("📊 First 100 bytes: \(debugBytes)")
 
         return tensorData
     }
@@ -281,19 +281,19 @@ public struct ImageHelpers {
         let width = Int(header[7])
         let channels = Int(header[8])
 
-        print("📊 DTTensor: \(width)x\(height), \(channels) channels, compressed: \(compressionFlag == 1012247)")
+        DrawThingsKitLogger.debug("📊 DTTensor: \(width)x\(height), \(channels) channels, compressed: \(compressionFlag == 1012247)")
 
         // Check for compression
         let isCompressed = (compressionFlag == 1012247)
 
         if isCompressed {
-            print("⚠️ Image is compressed with fpzip - decompression not yet implemented")
-            print("💡 Workaround: Disable compression in Draw Things server settings")
+            DrawThingsKitLogger.debug("⚠️ Image is compressed with fpzip - decompression not yet implemented")
+            DrawThingsKitLogger.debug("💡 Workaround: Disable compression in Draw Things server settings")
             throw ImageError.compressionNotSupported
         }
 
         guard channels == 3 || channels == 4 else {
-            print("⚠️ Unsupported channel count: \(channels). Only RGB (3) and RGBA (4) are supported.")
+            DrawThingsKitLogger.debug("⚠️ Unsupported channel count: \(channels). Only RGB (3) and RGBA (4) are supported.")
             throw ImageError.conversionFailed
         }
 
@@ -303,7 +303,7 @@ public struct ImageHelpers {
         let expectedDataSize = pixelDataOffset + (pixelCount * 2)
 
         guard tensorData.count >= expectedDataSize else {
-            print("⚠️ Data size mismatch: got \(tensorData.count), expected \(expectedDataSize)")
+            DrawThingsKitLogger.debug("⚠️ Data size mismatch: got \(tensorData.count), expected \(expectedDataSize)")
             throw ImageError.invalidData
         }
 
@@ -387,7 +387,7 @@ public struct ImageHelpers {
 
         // If image doesn't have an alpha channel, it's definitely opaque
         guard bitmap.hasAlpha else {
-            print("🔍 hasTransparency: Image has no alpha channel, returning false")
+            DrawThingsKitLogger.debug("🔍 hasTransparency: Image has no alpha channel, returning false")
             return false
         }
 
@@ -396,7 +396,7 @@ public struct ImageHelpers {
         let bytesPerRow = bitmap.bytesPerRow
         let samplesPerPixel = bitmap.samplesPerPixel
 
-        print("🔍 hasTransparency: Scanning \(width)x\(height), \(samplesPerPixel) samples/pixel, bytesPerRow=\(bytesPerRow)")
+        DrawThingsKitLogger.debug("🔍 hasTransparency: Scanning \(width)x\(height), \(samplesPerPixel) samples/pixel, bytesPerRow=\(bytesPerRow)")
 
         // Determine alpha channel position (usually first in ARGB or last in RGBA)
         let alphaPosition: Int
@@ -412,13 +412,13 @@ public struct ImageHelpers {
                 let pixelIndex = y * bytesPerRow + x * samplesPerPixel
                 let alpha = pixelData[pixelIndex + alphaPosition]
                 if alpha < 255 {
-                    print("🔍 hasTransparency: Found transparent pixel at (\(x), \(y)), alpha=\(alpha)")
+                    DrawThingsKitLogger.debug("🔍 hasTransparency: Found transparent pixel at (\(x), \(y)), alpha=\(alpha)")
                     return true  // Found transparent pixel
                 }
             }
         }
 
-        print("🔍 hasTransparency: All pixels are opaque")
+        DrawThingsKitLogger.debug("🔍 hasTransparency: All pixels are opaque")
         return false  // All pixels are opaque
     }
 
@@ -530,13 +530,13 @@ public struct ImageHelpers {
             }
         }
 
-        print("🎭 Created inpainting mask from alpha channel: \(width)x\(height), size: \(maskData.count) bytes")
-        print("🎭 Mask stats: \(transparentCount) transparent pixels (value 2), \(opaqueCount) opaque pixels (value 0)")
+        DrawThingsKitLogger.debug("🎭 Created inpainting mask from alpha channel: \(width)x\(height), size: \(maskData.count) bytes")
+        DrawThingsKitLogger.debug("🎭 Mask stats: \(transparentCount) transparent pixels (value 2), \(opaqueCount) opaque pixels (value 0)")
 
         // Print first 50 bytes as hex for verification
         let previewBytes = min(50, maskData.count)
         let hexString = maskData.prefix(previewBytes).map { String(format: "%02x", $0) }.joined(separator: " ")
-        print("🎭 Mask header (first \(previewBytes) bytes): \(hexString)")
+        DrawThingsKitLogger.debug("🎭 Mask header (first \(previewBytes) bytes): \(hexString)")
 
         return maskData
     }

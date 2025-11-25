@@ -324,6 +324,48 @@ do {
 }
 ```
 
+## Logging & Debugging
+
+DrawThingsKit uses Apple's unified logging system (`os.log`) for diagnostic output. By default, logging is disabled in production.
+
+### Enable Logging
+
+To enable logging for debugging:
+
+```swift
+import DrawThingsKit
+
+// Enable debug logging
+DrawThingsKitLogger.minimumLevel = .debug
+
+// Or set a higher threshold
+DrawThingsKitLogger.minimumLevel = .info  // Only info and above
+```
+
+### Log Levels
+
+- `.debug` - Detailed diagnostic information (request/response data, sizes, etc.)
+- `.info` - General informational messages
+- `.notice` - Significant events
+- `.error` - Error conditions
+- `.fault` - Critical failures
+- `.none` - Disable all logging (default)
+
+### Viewing Logs
+
+Logs can be viewed in:
+- **Console.app** on macOS (filter by subsystem: `com.drawthings.kit`)
+- **Xcode Debug Console** during development
+- Terminal using: `log stream --predicate 'subsystem == "com.drawthings.kit"'`
+
+### Disable Emoji
+
+If you prefer plain log messages without emoji prefixes:
+
+```swift
+DrawThingsKitLogger.useEmoji = false
+```
+
 ## Contributing
 
 1. Fork the repository

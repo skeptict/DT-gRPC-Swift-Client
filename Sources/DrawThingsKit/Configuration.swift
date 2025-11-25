@@ -407,7 +407,7 @@ public struct DrawThingsConfiguration {
             inpaintControl.targetBlocks = []
             inpaintControl.file = ""  // Empty file - mask is sent separately
             configT.controls = [inpaintControl]
-            print("🎭 Added inpaint control to configuration")
+            DrawThingsKitLogger.debug("Added inpaint control to configuration")
         } else {
             configT.controls = []
         }

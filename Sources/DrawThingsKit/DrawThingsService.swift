@@ -99,25 +99,25 @@ public actor DrawThingsService {
             $0.negativePrompt = negativePrompt
             $0.configuration = configuration
 
-            print("📤 Sending request: prompt='\(prompt)', config size=\(configuration.count) bytes")
+            DrawThingsKitLogger.debug("Sending request: prompt='\(prompt)', config size=\(configuration.count) bytes")
 
             if let image = image {
                 $0.image = image
-                print("   Image data: \(image.count) bytes")
+                DrawThingsKitLogger.debug("   Image data: \(image.count) bytes")
             }
 
             if let mask = mask {
                 $0.mask = mask
-                print("   Mask data: \(mask.count) bytes")
+                DrawThingsKitLogger.debug("   Mask data: \(mask.count) bytes")
             }
 
             $0.hints = hints
             if !hints.isEmpty {
-                print("   Hints: \(hints.count) hint(s)")
+                DrawThingsKitLogger.debug("   Hints: \(hints.count) hint(s)")
                 for (index, hint) in hints.enumerated() {
-                    print("      Hint \(index): type='\(hint.hintType)', tensors=\(hint.tensors.count)")
+                    DrawThingsKitLogger.debug("      Hint \(index): type='\(hint.hintType)', tensors=\(hint.tensors.count)")
                     for (tIndex, tensor) in hint.tensors.enumerated() {
-                        print("         Tensor \(tIndex): size=\(tensor.tensor.count) bytes, weight=\(tensor.weight)")
+                        DrawThingsKitLogger.debug("         Tensor \(tIndex): size=\(tensor.tensor.count) bytes, weight=\(tensor.weight)")
                     }
                 }
             }
@@ -139,31 +139,31 @@ public actor DrawThingsService {
 
             let call = client.generateImage(request) { response in
                 responseCount += 1
-                print("📦 Response #\(responseCount) received:")
-                print("   - generatedImages.count: \(response.generatedImages.count)")
-                print("   - hasCurrentSignpost: \(response.hasCurrentSignpost)")
-                print("   - hasDownloadSize: \(response.hasDownloadSize)")
-                print("   - hasPreviewImage: \(response.hasPreviewImage)")
-                print("   - hasScaleFactor: \(response.hasScaleFactor)")
-                print("   - tags.count: \(response.tags.count)")
-                print("   - signposts.count: \(response.signposts.count)")
+                DrawThingsKitLogger.debug("Response #\(responseCount) received:")
+                DrawThingsKitLogger.debug("   - generatedImages.count: \(response.generatedImages.count)")
+                DrawThingsKitLogger.debug("   - hasCurrentSignpost: \(response.hasCurrentSignpost)")
+                DrawThingsKitLogger.debug("   - hasDownloadSize: \(response.hasDownloadSize)")
+                DrawThingsKitLogger.debug("   - hasPreviewImage: \(response.hasPreviewImage)")
+                DrawThingsKitLogger.debug("   - hasScaleFactor: \(response.hasScaleFactor)")
+                DrawThingsKitLogger.debug("   - tags.count: \(response.tags.count)")
+                DrawThingsKitLogger.debug("   - signposts.count: \(response.signposts.count)")
 
                 if response.hasDownloadSize {
-                    print("   - downloadSize: \(response.downloadSize)")
+                    DrawThingsKitLogger.debug("   - downloadSize: \(response.downloadSize)")
                 }
 
                 if response.hasScaleFactor {
-                    print("   - scaleFactor: \(response.scaleFactor)")
+                    DrawThingsKitLogger.debug("   - scaleFactor: \(response.scaleFactor)")
                 }
 
                 if !response.tags.isEmpty {
-                    print("   - tags: \(response.tags)")
+                    DrawThingsKitLogger.debug("   - tags: \(response.tags)")
                 }
 
                 if !response.signposts.isEmpty {
-                    print("   - signposts details:")
+                    DrawThingsKitLogger.debug("   - signposts details:")
                     for (idx, signpost) in response.signposts.enumerated() {
-                        print("     [\(idx)]: \(signpost)")
+                        DrawThingsKitLogger.debug("     [\(idx)]: \(signpost)")
                     }
                 }
 
@@ -177,12 +177,12 @@ public actor DrawThingsService {
                 // Track expected download size
                 if response.hasDownloadSize && response.downloadSize > 0 {
                     expectedDownloadSize = response.downloadSize
-                    print("📊 Server indicated download size: \(response.downloadSize) bytes")
+                    DrawThingsKitLogger.debug("Server indicated download size: \(response.downloadSize) bytes")
                 }
 
                 // Capture preview image (the last one will be the final result)
                 if response.hasPreviewImage {
-                    print("🔍 Preview image received: \(response.previewImage.count) bytes")
+                    DrawThingsKitLogger.debug("Preview image received: \(response.previewImage.count) bytes")
                     lastPreviewImage = response.previewImage
 
                     // Send preview to handler
@@ -193,46 +193,46 @@ public actor DrawThingsService {
 
                 // Collect generated images (if server sends them directly)
                 if !response.generatedImages.isEmpty {
-                    print("📸 Received \(response.generatedImages.count) image(s):")
+                    DrawThingsKitLogger.debug("Received \(response.generatedImages.count) image(s):")
                     for (idx, img) in response.generatedImages.enumerated() {
-                        print("   - Image \(idx): \(img.count) bytes")
+                        DrawThingsKitLogger.debug("   - Image \(idx): \(img.count) bytes")
                     }
                     generatedImages.append(contentsOf: response.generatedImages)
 
                     let totalReceived = generatedImages.reduce(0) { $0 + $1.count }
-                    print("💾 Total image data received so far: \(totalReceived) bytes")
+                    DrawThingsKitLogger.debug("Total image data received so far: \(totalReceived) bytes")
                     if let expectedSize = expectedDownloadSize, totalReceived >= expectedSize {
-                        print("✅ Received all expected data (\(totalReceived) bytes)")
+                        DrawThingsKitLogger.debug("Received all expected data (\(totalReceived) bytes)")
                     }
                 }
             }
 
             call.status.whenComplete { result in
                 guard !hasResumed else {
-                    print("⚠️ Attempted to resume continuation twice")
+                    DrawThingsKitLogger.notice("Attempted to resume continuation twice")
                     return
                 }
                 hasResumed = true
 
-                print("🏁 Stream completed after \(responseCount) responses")
+                DrawThingsKitLogger.debug("Stream completed after \(responseCount) responses")
                 switch result {
                 case .success:
-                    print("✅ gRPC call completed successfully")
+                    DrawThingsKitLogger.debug("gRPC call completed successfully")
 
                     // If no images were received directly but we have a preview image, use it
                     if generatedImages.isEmpty && lastPreviewImage != nil {
-                        print("💡 No generatedImages received, using last preview image as result")
+                        DrawThingsKitLogger.info("No generatedImages received, using last preview image as result")
                         generatedImages.append(lastPreviewImage!)
                     }
 
-                    print("📊 Total images to return: \(generatedImages.count)")
+                    DrawThingsKitLogger.debug("Total images to return: \(generatedImages.count)")
                     if generatedImages.isEmpty && expectedDownloadSize != nil {
-                        print("⚠️ Warning: Server indicated \(expectedDownloadSize!) bytes but no images received")
-                        print("💡 The server may require a separate request to fetch the image data")
+                        DrawThingsKitLogger.notice("Warning: Server indicated \(expectedDownloadSize!) bytes but no images received")
+                        DrawThingsKitLogger.info("The server may require a separate request to fetch the image data")
                     }
                     continuation.resume(returning: generatedImages)
                 case .failure(let err):
-                    print("❌ gRPC call failed: \(err)")
+                    DrawThingsKitLogger.error("gRPC call failed: \(err)")
                     continuation.resume(throwing: err)
                 }
             }
