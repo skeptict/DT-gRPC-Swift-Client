@@ -26,6 +26,8 @@ The following features have been tested and confirmed working:
 - **Moodboard/Reference Images**: Using reference images to influence generation (shuffle hints)
 - **ControlNet Support**: Using ControlNet models for guided generation (e.g., PuLID, depth, pose, etc.)
 - **LoRA Support**: Apply LoRA models to modify generation style
+- **Video Generation**: Generate video/animation sequences (frames returned sequentially)
+- **Image-to-Video**: Generate video from a starting image
 - **Progress Tracking**: Real-time generation progress updates
 - **Preview Images**: Receive preview images during generation
 - **Model Metadata**: Query available models and samplers
@@ -34,7 +36,6 @@ The following features have been tested and confirmed working:
 
 The following features are available in the protocol but have not yet been tested:
 
-- **Video Generation**: Generating video/animation sequences
 - **Multi-stage Models**: Stage 2 parameters for multi-stage generation pipelines
 - **Advanced Optimization**: TEA Cache and other performance optimizations
 - **File Upload**: Uploading models or other files to the server
@@ -345,6 +346,110 @@ let images = try await client.generateImage(
   - `"all"`: Apply to all stages
   - `"base"`: Apply only during base model generation
   - `"refiner"`: Apply only during refiner stage
+
+### Video Generation
+
+DrawThingsKit supports video/animation generation with models that support temporal generation (e.g., Stable Video Diffusion, AnimateDiff, etc.). Video frames are generated on the server and returned sequentially as individual images.
+
+#### Text-to-Video
+
+```swift
+// Configure video generation parameters
+let config = DrawThingsConfiguration(
+    width: 1024,
+    height: 576,
+    steps: 30,
+    model: "svd_xt_1.1.safetensors",
+    fpsId: 8,                    // Frames per second
+    motionBucketId: 127,         // Motion intensity (0-255)
+    numFrames: 25                // Number of frames to generate
+)
+
+let frames = try await client.generateImage(
+    prompt: "A cat walking through a garden",
+    configuration: config
+)
+
+// frames is an array of NSImage, one for each frame
+print("Generated \(frames.count) frames")
+
+// Process frames (e.g., save to disk, create video file, etc.)
+for (index, frame) in frames.enumerated() {
+    // Save frame_001.png, frame_002.png, etc.
+    saveFrame(frame, index: index)
+}
+```
+
+#### Image-to-Video
+
+Generate a video starting from a base image:
+
+```swift
+let startImage = NSImage(named: "start_frame.jpg")!
+
+let config = DrawThingsConfiguration(
+    width: 1024,
+    height: 576,
+    steps: 30,
+    model: "svd_xt_1.1.safetensors",
+    fpsId: 8,
+    motionBucketId: 127,
+    numFrames: 25,
+    strength: 0.8               // How much to transform the input image
+)
+
+let frames = try await client.generateImage(
+    prompt: "Animate this image",
+    configuration: config,
+    image: startImage
+)
+
+print("Generated \(frames.count) video frames from input image")
+```
+
+**Video Generation Parameters:**
+
+- `numFrames`: Number of frames to generate (e.g., 14, 25, 81)
+- `fpsId`: Frames per second for the video (typically 5-30)
+- `motionBucketId`: Motion intensity/scale
+  - Lower values (0-64): Subtle motion
+  - Medium values (65-127): Normal motion
+  - Higher values (128-255): Strong motion
+- `condAug`: Conditioning augmentation (noise) for guiding frames (default: 0.02)
+- `startFrameCfg`: CFG scale for the first frame guidance (default: 1.0)
+
+**Important Notes:**
+
+- **Sequential Frame Delivery**: The gRPC server generates all frames, then sends them back **one at a time** in sequence. The `generateImage()` method will return an array with all frames once complete.
+- **Processing Time**: Video generation takes significantly longer than single images due to generating multiple frames.
+- **Frame Count**: Higher frame counts result in longer videos but also longer generation times.
+- **Memory Usage**: All frames are held in memory as NSImage objects. For long videos (100+ frames), consider processing and saving frames as they arrive.
+
+**Example: Saving Video Frames**
+
+```swift
+let frames = try await client.generateImage(
+    prompt: "A serene ocean sunset with gentle waves",
+    configuration: config
+)
+
+// Save frames as sequential PNG files
+for (index, frame) in frames.enumerated() {
+    let filename = String(format: "frame_%03d.png", index + 1)
+    let url = outputDirectory.appendingPathComponent(filename)
+
+    if let tiffData = frame.tiffRepresentation,
+       let bitmap = NSBitmapImageRep(data: tiffData),
+       let pngData = bitmap.representation(using: .png, properties: [:]) {
+        try pngData.write(to: url)
+    }
+}
+
+print("Saved \(frames.count) frames to \(outputDirectory.path)")
+
+// Use external tools to create video from frames:
+// ffmpeg -framerate 8 -i frame_%03d.png -c:v libx264 -pix_fmt yuv420p output.mp4
+```
 
 ## Architecture
 
