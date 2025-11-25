@@ -292,8 +292,8 @@ public struct ImageHelpers {
             throw ImageError.compressionNotSupported
         }
 
-        guard channels == 3 || channels == 4 else {
-            DrawThingsKitLogger.debug("⚠️ Unsupported channel count: \(channels). Only RGB (3) and RGBA (4) are supported.")
+        guard channels == 3 || channels == 4 || channels == 16 else {
+            DrawThingsKitLogger.debug("⚠️ Unsupported channel count: \(channels). Only RGB (3), RGBA (4), and 16-channel latents are supported.")
             throw ImageError.conversionFailed
         }
 
@@ -317,7 +317,37 @@ public struct ImageHelpers {
             rgbData.withUnsafeMutableBytes { (outPtr: UnsafeMutableRawBufferPointer) in
                 let uint8Ptr = outPtr.baseAddress!.assumingMemoryBound(to: UInt8.self)
 
-                if channels == 4 {
+                if channels == 16 {
+                    // 16-channel latent space to RGB conversion (Flux/SD3 coefficients)
+                    // Based on Draw Things ImageConverter.swift for 16-channel latents
+                    for i in 0..<(width * height) {
+                        var latent = [Float](repeating: 0, count: 16)
+                        for c in 0..<16 {
+                            latent[c] = Float(Float16(bitPattern: float16Ptr[i * 16 + c]))
+                        }
+
+                        // Flux/SD3 latent-to-RGB coefficients
+                        let r = 0.298 * latent[0] + 0.207 * latent[1] + 0.208 * latent[2] + 0.304 * latent[3] +
+                               0.119 * latent[4] + 0.135 * latent[5] + 0.124 * latent[6] + 0.141 * latent[7] +
+                               0.159 * latent[8] + 0.149 * latent[9] + 0.130 * latent[10] + 0.188 * latent[11] +
+                               0.114 * latent[12] + 0.150 * latent[13] + 0.116 * latent[14] + 0.134 * latent[15]
+
+                        let g = 0.162 * latent[0] + 0.227 * latent[1] + 0.216 * latent[2] + 0.161 * latent[3] +
+                               0.137 * latent[4] + 0.146 * latent[5] + 0.137 * latent[6] + 0.148 * latent[7] +
+                               0.145 * latent[8] + 0.157 * latent[9] + 0.141 * latent[10] + 0.143 * latent[11] +
+                               0.133 * latent[12] + 0.163 * latent[13] + 0.126 * latent[14] + 0.142 * latent[15]
+
+                        let b = 0.042 * latent[0] + 0.158 * latent[1] + 0.185 * latent[2] + 0.042 * latent[3] +
+                               0.168 * latent[4] + 0.176 * latent[5] + 0.178 * latent[6] + 0.176 * latent[7] +
+                               0.139 * latent[8] + 0.149 * latent[9] + 0.155 * latent[10] + 0.125 * latent[11] +
+                               0.163 * latent[12] + 0.168 * latent[13] + 0.163 * latent[14] + 0.161 * latent[15]
+
+                        // Scale from normalized range to [0, 255]
+                        uint8Ptr[i * 3 + 0] = UInt8(clamping: Int((r + 1.0) * 127.5))
+                        uint8Ptr[i * 3 + 1] = UInt8(clamping: Int((g + 1.0) * 127.5))
+                        uint8Ptr[i * 3 + 2] = UInt8(clamping: Int((b + 1.0) * 127.5))
+                    }
+                } else if channels == 4 {
                     // 4-channel latent space to RGB conversion (SDXL coefficients)
                     // Based on Draw Things ImageConverter.swift
                     for i in 0..<(width * height) {
