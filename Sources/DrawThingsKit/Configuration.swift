@@ -149,6 +149,7 @@ public struct DrawThingsConfiguration {
     public let numFrames: Int32
 
     // Refiner parameters
+    public let refinerModel: String?
     public let refinerStart: Float
     public let zeroNegativePrompt: Bool
 
@@ -226,6 +227,7 @@ public struct DrawThingsConfiguration {
         condAug: Float = 0.02,
         startFrameCfg: Float = 1.0,
         numFrames: Int32 = 14,
+        refinerModel: String? = nil,
         refinerStart: Float = 0.85,
         zeroNegativePrompt: Bool = false,
         seedMode: Int32 = 2
@@ -300,6 +302,7 @@ public struct DrawThingsConfiguration {
         self.condAug = condAug
         self.startFrameCfg = startFrameCfg
         self.numFrames = numFrames
+        self.refinerModel = refinerModel
         self.refinerStart = refinerStart
         self.zeroNegativePrompt = zeroNegativePrompt
         self.seedMode = seedMode
@@ -418,6 +421,7 @@ public struct DrawThingsConfiguration {
         configT.numFrames = UInt32(numFrames)
 
         // Refiner parameters
+        configT.refinerModel = refinerModel
         configT.refinerStart = refinerStart
         configT.zeroNegativePrompt = zeroNegativePrompt
 
