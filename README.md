@@ -10,6 +10,32 @@ A Swift framework for interacting with Draw Things gRPC server, designed for eas
 - **Image Utilities**: Built-in helpers for image conversion and manipulation
 - **Type Safety**: Full Swift type safety with generated protobuf code
 
+## Feature Status
+
+### ✅ Tested & Working
+
+The following features have been tested and confirmed working:
+
+- **Text-to-Image Generation**: Basic image generation from text prompts
+- **Image-to-Image**: Transform existing images based on prompts
+- **Inpainting**: Selective image editing with masks
+- **Moodboard/Reference Images**: Using reference images to influence generation (shuffle hints)
+- **Progress Tracking**: Real-time generation progress updates
+- **Preview Images**: Receive preview images during generation
+- **Model Metadata**: Query available models and samplers
+
+### ⚠️ Untested Features
+
+The following features are available in the protocol but have not yet been tested:
+
+- **ControlNet Support**: Using ControlNet models for guided generation
+- **Video Generation**: Generating video/animation sequences
+- **Multi-stage Models**: Stage 2 parameters for multi-stage generation pipelines
+- **Advanced Optimization**: TEA Cache and other performance optimizations
+- **File Upload**: Uploading models or other files to the server
+
+Contributions and testing reports for these features are welcome!
+
 ## Requirements
 
 - macOS 14.0+
