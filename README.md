@@ -16,6 +16,18 @@ A Swift framework for interacting with Draw Things gRPC server, designed for eas
 - iOS 17.0+ (if building for iOS)
 - Xcode 15.0+
 - Swift 5.9+
+- Draw Things app with gRPC server enabled or standalone gRPC server for nVidia
+
+### Draw Things Server Setup
+
+To use this framework, you need to configure the Draw Things gRPC server with the following settings:
+
+1. **Response Compression**: Must be **disabled**
+   - Having server-side compression enabled will cause failure, the framework does not currently have the ability to decompress responses
+
+2. **Enable Model Browsing**: Recommended to be **enabled**
+   - This allows the framework to query available models, samplers, and other metadata
+   - Required for proper initialization and model selection
 
 ## Installation
 
