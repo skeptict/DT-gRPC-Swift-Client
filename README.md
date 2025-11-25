@@ -31,7 +31,7 @@ Or add it to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/your-repo/DrawThingsKit.git", from: "1.0.0")
+    .package(url: "https://github.com/euphoriacyberware-ai/DT-gRPC-Swift-Client", from: "1.0.0")
 ]
 ```
 
@@ -138,6 +138,67 @@ let images = try await client.generateImage(
     mask: maskImage
 )
 ```
+
+### Moodboard / Reference Images
+
+Use moodboard (also known as "shuffle") to provide reference images that influence the generation. This is particularly useful with models like Qwen Image Edit:
+
+```swift
+// Single reference image
+let referenceImage = NSImage(named: "style_reference.jpg")!
+let referenceData = try ImageHelpers.nsImageToDTTensor(referenceImage, forceRGB: true)
+
+var tensorAndWeight = TensorAndWeight()
+tensorAndWeight.tensor = referenceData
+tensorAndWeight.weight = 1.0  // Weight from 0.0 to 1.0
+
+var hint = HintProto()
+hint.hintType = "shuffle"  // Use "shuffle" for moodboard/reference images
+hint.tensors = [tensorAndWeight]
+
+let images = try await service.generateImage(
+    prompt: "A woman wearing a blue dress",
+    negativePrompt: "",
+    configuration: configData,
+    hints: [hint]
+)
+```
+
+Multiple reference images can be provided by adding more hints to the array:
+
+```swift
+// Multiple reference images
+var hints: [HintProto] = []
+
+let referenceImages = [
+    NSImage(named: "dress_ref.jpg")!,
+    NSImage(named: "style_ref.jpg")!,
+    NSImage(named: "color_ref.jpg")!
+]
+
+for refImage in referenceImages {
+    let imageData = try ImageHelpers.nsImageToDTTensor(refImage, forceRGB: true)
+
+    var tensorAndWeight = TensorAndWeight()
+    tensorAndWeight.tensor = imageData
+    tensorAndWeight.weight = 1.0
+
+    var hint = HintProto()
+    hint.hintType = "shuffle"
+    hint.tensors = [tensorAndWeight]
+
+    hints.append(hint)
+}
+
+let images = try await service.generateImage(
+    prompt: "Combine elements from the reference images",
+    negativePrompt: "",
+    configuration: configData,
+    hints: hints
+)
+```
+
+**Note:** The moodboard feature works best with models that are designed to use reference images.
 
 ## Architecture
 
