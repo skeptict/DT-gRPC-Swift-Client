@@ -336,6 +336,14 @@ do {
 
 MIT License - see LICENSE file for details.
 
+## Credits
+
+This Swift framework is a port of the original TypeScript implementation by KC Jerrell:
+- **Original Project**: [dt-grpc-ts](https://github.com/kcjerrell/dt-grpc-ts)
+- **Author**: KC Jerrell ([@kcjerrell](https://github.com/kcjerrell))
+
+Special thanks to KC for pioneering the TypeScript gRPC client for Draw Things, which served as the foundation for this Swift implementation.
+
 ## Compatibility
 
-This framework is converted from the original TypeScript implementation and maintains API compatibility with the Draw Things gRPC server protocol.
+This framework maintains API compatibility with the Draw Things gRPC server protocol.
