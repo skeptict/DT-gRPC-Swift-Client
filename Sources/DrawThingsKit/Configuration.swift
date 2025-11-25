@@ -22,6 +22,31 @@ public struct LoRAConfig {
     }
 }
 
+public struct ControlConfig {
+    public let file: String
+    public let weight: Float
+    public let guidanceStart: Float
+    public let guidanceEnd: Float
+    public let controlMode: String  // "balanced", "prompt", or "control"
+
+    public init(file: String, weight: Float = 1.0, guidanceStart: Float = 0.0, guidanceEnd: Float = 1.0, controlMode: String = "balanced") {
+        self.file = file
+        self.weight = weight
+        self.guidanceStart = guidanceStart
+        self.guidanceEnd = guidanceEnd
+        self.controlMode = controlMode
+    }
+
+    // Map mode string to FlatBuffer enum
+    internal func controlModeEnum() -> ControlMode {
+        switch controlMode.lowercased() {
+        case "prompt": return .prompt
+        case "control": return .control
+        default: return .balanced
+        }
+    }
+}
+
 public struct DrawThingsConfiguration {
     // Core parameters
     public let width: Int32
@@ -33,6 +58,7 @@ public struct DrawThingsConfiguration {
     public let seed: Int64?
     public let clipSkip: Int32
     public let loras: [LoRAConfig]
+    public let controls: [ControlConfig]
     public let shift: Float
 
     // Batch parameters
@@ -139,6 +165,7 @@ public struct DrawThingsConfiguration {
         seed: Int64? = nil,
         clipSkip: Int32 = 1,
         loras: [LoRAConfig] = [],
+        controls: [ControlConfig] = [],
         shift: Float = 1.0,
         batchCount: Int32 = 1,
         batchSize: Int32 = 1,
@@ -212,6 +239,7 @@ public struct DrawThingsConfiguration {
         self.seed = seed
         self.clipSkip = clipSkip
         self.loras = loras
+        self.controls = controls
         self.shift = shift
         self.batchCount = batchCount
         self.batchSize = batchSize
@@ -393,6 +421,22 @@ public struct DrawThingsConfiguration {
         configT.refinerStart = refinerStart
         configT.zeroNegativePrompt = zeroNegativePrompt
 
+        // Add user-provided controls (ControlNet)
+        var controlsArray: [ControlT] = controls.map { control in
+            let controlT = ControlT()
+            controlT.file = control.file
+            controlT.weight = control.weight
+            controlT.guidanceStart = control.guidanceStart
+            controlT.guidanceEnd = control.guidanceEnd
+            controlT.controlMode = control.controlModeEnum()
+            controlT.noPrompt = false
+            controlT.globalAveragePooling = false
+            controlT.downSamplingRate = 1.0
+            controlT.targetBlocks = []
+            DrawThingsKitLogger.debug("Added ControlNet control: \(control.file)")
+            return controlT
+        }
+
         // Add inpaint control if enabled
         if enableInpainting {
             let inpaintControl = ControlT()
@@ -406,11 +450,11 @@ public struct DrawThingsConfiguration {
             inpaintControl.controlMode = .balanced
             inpaintControl.targetBlocks = []
             inpaintControl.file = ""  // Empty file - mask is sent separately
-            configT.controls = [inpaintControl]
+            controlsArray.append(inpaintControl)
             DrawThingsKitLogger.debug("Added inpaint control to configuration")
-        } else {
-            configT.controls = []
         }
+
+        configT.controls = controlsArray
 
         // Add LoRAs
         configT.loras = loras.map { lora in

@@ -24,6 +24,8 @@ The following features have been tested and confirmed working:
 - **Image-to-Image**: Transform existing images based on prompts
 - **Inpainting**: Selective image editing with masks
 - **Moodboard/Reference Images**: Using reference images to influence generation (shuffle hints)
+- **ControlNet Support**: Using ControlNet models for guided generation (e.g., PuLID, depth, pose, etc.)
+- **LoRA Support**: Apply LoRA models to modify generation style
 - **Progress Tracking**: Real-time generation progress updates
 - **Preview Images**: Receive preview images during generation
 - **Model Metadata**: Query available models and samplers
@@ -32,7 +34,6 @@ The following features have been tested and confirmed working:
 
 The following features are available in the protocol but have not yet been tested:
 
-- **ControlNet Support**: Using ControlNet models for guided generation
 - **Video Generation**: Generating video/animation sequences
 - **Multi-stage Models**: Stage 2 parameters for multi-stage generation pipelines
 - **Advanced Optimization**: TEA Cache and other performance optimizations
@@ -241,6 +242,109 @@ let images = try await service.generateImage(
 ```
 
 **Note:** The moodboard feature works best with models that are designed to use reference images.
+
+### ControlNet
+
+ControlNet allows you to guide image generation using control images (such as depth maps, poses, or reference faces). The control image is provided as a hint, and the ControlNet model configuration specifies how to use it:
+
+```swift
+// Create ControlNet configuration
+let controlConfig = ControlConfig(
+    file: "pulid_flux_v0.9.1.safetensors",  // ControlNet model file
+    weight: 1.0,                             // Control strength (0.0 to 2.0)
+    guidanceStart: 0.0,                      // When to start applying control (0.0 = beginning)
+    guidanceEnd: 1.0,                        // When to stop applying control (1.0 = end)
+    controlMode: "balanced"                  // "balanced", "prompt", or "control"
+)
+
+// Create configuration with ControlNet
+let config = DrawThingsConfiguration(
+    width: 1024,
+    height: 1024,
+    steps: 30,
+    model: "flux1_chroma_v48.safetensors",
+    controls: [controlConfig]
+)
+
+// Prepare the control image (e.g., a face for PuLID)
+let controlImage = NSImage(named: "reference_face.jpg")!
+let controlImageData = try ImageHelpers.nsImageToDTTensor(controlImage, forceRGB: true)
+
+var tensorAndWeight = TensorAndWeight()
+tensorAndWeight.tensor = controlImageData
+tensorAndWeight.weight = 1.0
+
+var hint = HintProto()
+hint.hintType = "shuffle"  // Control images are sent as hints
+hint.tensors = [tensorAndWeight]
+
+// Generate with ControlNet
+let images = try await service.generateImage(
+    prompt: "A full-body portrait of a character",
+    negativePrompt: "",
+    configuration: try config.toFlatBufferData(),
+    hints: [hint]
+)
+```
+
+**ControlNet Parameters:**
+
+- `file`: The ControlNet model filename (must be compatible with the base model)
+- `weight`: Control strength - higher values give stronger control (default: 1.0, range: 0.0-2.0)
+- `guidanceStart`: When to start applying control during generation (0.0 = first step)
+- `guidanceEnd`: When to stop applying control (1.0 = last step)
+- `controlMode`:
+  - `"balanced"`: Equal weight between prompt and control
+  - `"prompt"`: Favor the text prompt more
+  - `"control"`: Favor the control image more
+
+**Common ControlNet Types:**
+- **PuLID**: Face/character consistency (use with portrait/face images)
+- **Depth**: Control composition with depth maps
+- **Canny**: Edge-based control
+- **Pose**: Human pose control (OpenPose)
+- **Scribble**: Sketch-based control
+
+### Using LoRAs
+
+LoRAs (Low-Rank Adaptations) allow you to modify the generation style or add specific concepts:
+
+```swift
+// Create LoRA configurations
+let loraConfig1 = LoRAConfig(
+    file: "style_lora.safetensors",
+    weight: 0.8,
+    mode: "all"  // "all", "base", or "refiner"
+)
+
+let loraConfig2 = LoRAConfig(
+    file: "concept_lora.safetensors",
+    weight: 1.0,
+    mode: "all"
+)
+
+// Create configuration with LoRAs
+let config = DrawThingsConfiguration(
+    width: 1024,
+    height: 1024,
+    steps: 30,
+    model: "sd_xl_base_1.0.safetensors",
+    loras: [loraConfig1, loraConfig2]
+)
+
+let images = try await client.generateImage(
+    prompt: "A beautiful landscape",
+    configuration: config
+)
+```
+
+**LoRA Parameters:**
+- `file`: The LoRA model filename (must be compatible with base model version)
+- `weight`: LoRA influence strength (typically 0.0-1.0, but can go higher)
+- `mode`: When to apply the LoRA
+  - `"all"`: Apply to all stages
+  - `"base"`: Apply only during base model generation
+  - `"refiner"`: Apply only during refiner stage
 
 ## Architecture
 
