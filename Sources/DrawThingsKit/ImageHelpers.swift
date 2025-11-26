@@ -318,34 +318,52 @@ public struct ImageHelpers {
                 let uint8Ptr = outPtr.baseAddress!.assumingMemoryBound(to: UInt8.self)
 
                 if channels == 16 {
-                    // 16-channel latent space to RGB conversion (Flux/SD3 coefficients)
-                    // Based on Draw Things ImageConverter.swift for 16-channel latents
+                    // 16-channel latent space to RGB conversion (Flux coefficients)
+                    // Based on Draw Things ImageConverter.swift for Flux/HiDream models
                     for i in 0..<(width * height) {
-                        var latent = [Float](repeating: 0, count: 16)
-                        for c in 0..<16 {
-                            latent[c] = Float(Float16(bitPattern: float16Ptr[i * 16 + c]))
-                        }
+                        let v0 = Float(Float16(bitPattern: float16Ptr[i * 16 + 0]))
+                        let v1 = Float(Float16(bitPattern: float16Ptr[i * 16 + 1]))
+                        let v2 = Float(Float16(bitPattern: float16Ptr[i * 16 + 2]))
+                        let v3 = Float(Float16(bitPattern: float16Ptr[i * 16 + 3]))
+                        let v4 = Float(Float16(bitPattern: float16Ptr[i * 16 + 4]))
+                        let v5 = Float(Float16(bitPattern: float16Ptr[i * 16 + 5]))
+                        let v6 = Float(Float16(bitPattern: float16Ptr[i * 16 + 6]))
+                        let v7 = Float(Float16(bitPattern: float16Ptr[i * 16 + 7]))
+                        let v8 = Float(Float16(bitPattern: float16Ptr[i * 16 + 8]))
+                        let v9 = Float(Float16(bitPattern: float16Ptr[i * 16 + 9]))
+                        let v10 = Float(Float16(bitPattern: float16Ptr[i * 16 + 10]))
+                        let v11 = Float(Float16(bitPattern: float16Ptr[i * 16 + 11]))
+                        let v12 = Float(Float16(bitPattern: float16Ptr[i * 16 + 12]))
+                        let v13 = Float(Float16(bitPattern: float16Ptr[i * 16 + 13]))
+                        let v14 = Float(Float16(bitPattern: float16Ptr[i * 16 + 14]))
+                        let v15 = Float(Float16(bitPattern: float16Ptr[i * 16 + 15]))
 
-                        // Flux/SD3 latent-to-RGB coefficients
-                        let r = 0.298 * latent[0] + 0.207 * latent[1] + 0.208 * latent[2] + 0.304 * latent[3] +
-                               0.119 * latent[4] + 0.135 * latent[5] + 0.124 * latent[6] + 0.141 * latent[7] +
-                               0.159 * latent[8] + 0.149 * latent[9] + 0.130 * latent[10] + 0.188 * latent[11] +
-                               0.114 * latent[12] + 0.150 * latent[13] + 0.116 * latent[14] + 0.134 * latent[15]
+                        // Flux latent-to-RGB coefficients (from Draw Things source)
+                        // Red channel
+                        var rVal: Float = -0.0346 * v0 + 0.0034 * v1 + 0.0275 * v2 - 0.0174 * v3
+                        rVal += 0.0859 * v4 + 0.0004 * v5 + 0.0405 * v6 - 0.0236 * v7
+                        rVal += -0.0245 * v8 + 0.1008 * v9 - 0.0515 * v10 + 0.0428 * v11
+                        rVal += 0.0817 * v12 - 0.1264 * v13 - 0.0280 * v14 - 0.1262 * v15 - 0.0329
+                        let r = rVal * 127.5 + 127.5
 
-                        let g = 0.162 * latent[0] + 0.227 * latent[1] + 0.216 * latent[2] + 0.161 * latent[3] +
-                               0.137 * latent[4] + 0.146 * latent[5] + 0.137 * latent[6] + 0.148 * latent[7] +
-                               0.145 * latent[8] + 0.157 * latent[9] + 0.141 * latent[10] + 0.143 * latent[11] +
-                               0.133 * latent[12] + 0.163 * latent[13] + 0.126 * latent[14] + 0.142 * latent[15]
+                        // Green channel
+                        var gVal: Float = 0.0244 * v0 + 0.0210 * v1 - 0.0668 * v2 + 0.0160 * v3
+                        gVal += 0.0721 * v4 + 0.0383 * v5 + 0.0861 * v6 - 0.0185 * v7
+                        gVal += 0.0250 * v8 + 0.0755 * v9 + 0.0201 * v10 - 0.0012 * v11
+                        gVal += 0.0765 * v12 - 0.0522 * v13 - 0.0881 * v14 - 0.0982 * v15 - 0.0718
+                        let g = gVal * 127.5 + 127.5
 
-                        let b = 0.042 * latent[0] + 0.158 * latent[1] + 0.185 * latent[2] + 0.042 * latent[3] +
-                               0.168 * latent[4] + 0.176 * latent[5] + 0.178 * latent[6] + 0.176 * latent[7] +
-                               0.139 * latent[8] + 0.149 * latent[9] + 0.155 * latent[10] + 0.125 * latent[11] +
-                               0.163 * latent[12] + 0.168 * latent[13] + 0.163 * latent[14] + 0.161 * latent[15]
+                        // Blue channel
+                        var bVal: Float = 0.0681 * v0 + 0.0687 * v1 - 0.0433 * v2 + 0.0617 * v3
+                        bVal += 0.0329 * v4 + 0.0115 * v5 + 0.0915 * v6 - 0.0259 * v7
+                        bVal += 0.1180 * v8 - 0.0421 * v9 + 0.0011 * v10 - 0.0036 * v11
+                        bVal += 0.0749 * v12 - 0.1103 * v13 - 0.0499 * v14 - 0.0778 * v15 - 0.0851
+                        let b = bVal * 127.5 + 127.5
 
-                        // Scale from normalized range to [0, 255]
-                        uint8Ptr[i * 3 + 0] = UInt8(clamping: Int((r + 1.0) * 127.5))
-                        uint8Ptr[i * 3 + 1] = UInt8(clamping: Int((g + 1.0) * 127.5))
-                        uint8Ptr[i * 3 + 2] = UInt8(clamping: Int((b + 1.0) * 127.5))
+                        // Clamp to valid RGB range
+                        uint8Ptr[i * 3 + 0] = UInt8(clamping: Int(r.isFinite ? r : 0))
+                        uint8Ptr[i * 3 + 1] = UInt8(clamping: Int(g.isFinite ? g : 0))
+                        uint8Ptr[i * 3 + 2] = UInt8(clamping: Int(b.isFinite ? b : 0))
                     }
                 } else if channels == 4 {
                     // 4-channel latent space to RGB conversion (SDXL coefficients)
