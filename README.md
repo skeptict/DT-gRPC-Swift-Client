@@ -156,6 +156,7 @@ let config = DrawThingsConfiguration(
     clipSkip: 2
 )
 ```
+See ./Examples/Config from JSON.swift within this project for usable functions which populate a DrawThingsConfiguration from a Draw Things JSON configuration passed in a String value.
 
 ### Image-to-Image Generation
 
