@@ -151,7 +151,7 @@ let config = DrawThingsConfiguration(
     steps: 30,
     model: "sd_xl_base_1.0.safetensors",
     sampler: SamplerType.dpm2a.rawValue,
-    cfgScale: 7.5,
+    guidanceScale: 7.5,
     seed: 12345,
     clipSkip: 2
 )
@@ -407,7 +407,7 @@ print("Generated \(frames.count) video frames from input image")
 **Video Generation Parameters:**
 
 - `numFrames`: Number of frames to generate (e.g., 14, 25, 81)
-- `startFrameCfg`: CFG scale for the first frame guidance (default: 1.0)
+- `startFrameGuidance`: CFG scale for the first frame guidance (default: 1.0)
 
 **Important Notes:**
 

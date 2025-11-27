@@ -92,7 +92,9 @@ private func loadDrawThingsConfig(for key: String) async -> DrawThingsConfigurat
     let clipWeight = Float(json["clipWeight"] as? Double ?? 1.0)
     let guidanceEmbed = Float(json["guidanceEmbed"] as? Double ?? cfgScale)
     let speedUpWithGuidanceEmbed = json["speedUpWithGuidanceEmbed"] as? Bool ?? true
-    
+    let cfgZeroStar = json["cfgZeroStar"] as? Bool ?? false
+    let cfgZeroInitSteps = Int32(json["cfgZeroInitSteps"] as? Int ?? 0)
+
     // Mask/Inpaint parameters
     let maskBlur = Float(json["maskBlur"] as? Double ?? 1.5)
     let maskBlurOutset = Int32(json["maskBlurOutset"] as? Int ?? 0)
@@ -147,7 +149,7 @@ private func loadDrawThingsConfig(for key: String) async -> DrawThingsConfigurat
     
     // Stage 2 parameters
     let stage2Steps = Int32(json["stage2Steps"] as? Int ?? 10)
-    let stage2Cfg = Float(json["stage2Cfg"] as? Double ?? 1.0)
+    let stage2Guidance = Float(json["stage2Guidance"] as? Double ?? 1.0)
     let stage2Shift = Float(json["stage2Shift"] as? Double ?? 1.0)
     
     // TEA Cache parameters
@@ -158,15 +160,14 @@ private func loadDrawThingsConfig(for key: String) async -> DrawThingsConfigurat
     let teaCacheMaxSkipSteps = Int32(json["teaCacheMaxSkipSteps"] as? Int ?? 3)
     
     // Causal inference parameters
-    let causalInferenceEnabled = json["causalInferenceEnabled"] as? Bool ?? false
     let causalInference = Int32(json["causalInference"] as? Int ?? 3)
     let causalInferencePad = Int32(json["causalInferencePad"] as? Int ?? 0)
     
     // Video parameters
-    let fpsId = Int32(json["fpsId"] as? Int ?? 5)
-    let motionBucketId = Int32(json["motionBucketId"] as? Int ?? 127)
-    let condAug = Float(json["condAug"] as? Double ?? 0.02)
-    let startFrameCfg = Float(json["startFrameCfg"] as? Double ?? 1.0)
+    let fps = Int32(json["fps"] as? Int ?? 5)
+    let motionScale = Int32(json["motionScale"] as? Int ?? 127)
+    let guidingFrameNoise = Float(json["guidingFrameNoise"] as? Double ?? 0.02)
+    let startFrameGuidance = Float(json["startFrameGuidance"] as? Double ?? 1.0)
     let numFrames = Int32(json["numFrames"] as? Int ?? 14)
     
     // Refiner parameters
@@ -190,7 +191,7 @@ private func loadDrawThingsConfig(for key: String) async -> DrawThingsConfigurat
         steps: Int32(steps),
         model: model,
         sampler: samplerStr,
-        cfgScale: Float(cfgScale),
+        guidanceScale: Float(cfgScale),
         seed: nil,
         clipSkip: clipSkip,
         loras: loras,
@@ -203,6 +204,8 @@ private func loadDrawThingsConfig(for key: String) async -> DrawThingsConfigurat
         clipWeight: clipWeight,
         guidanceEmbed: guidanceEmbed,
         speedUpWithGuidanceEmbed: speedUpWithGuidanceEmbed,
+        cfgZeroStar: cfgZeroStar,
+        cfgZeroInitSteps: cfgZeroInitSteps,
         maskBlur: maskBlur,
         maskBlurOutset: maskBlurOutset,
         preserveOriginalAfterInpaint: preserveOriginalAfterInpaint,
@@ -240,20 +243,19 @@ private func loadDrawThingsConfig(for key: String) async -> DrawThingsConfigurat
         hiresFixHeight: hiresFixHeight,
         hiresFixStrength: hiresFixStrength,
         stage2Steps: stage2Steps,
-        stage2Cfg: stage2Cfg,
+        stage2Guidance: stage2Guidance,
         stage2Shift: stage2Shift,
         teaCache: teaCache,
         teaCacheStart: teaCacheStart,
         teaCacheEnd: teaCacheEnd,
         teaCacheThreshold: teaCacheThreshold,
         teaCacheMaxSkipSteps: teaCacheMaxSkipSteps,
-        causalInferenceEnabled: causalInferenceEnabled,
         causalInference: causalInference,
         causalInferencePad: causalInferencePad,
-        fpsId: fpsId,
-        motionBucketId: motionBucketId,
-        condAug: condAug,
-        startFrameCfg: startFrameCfg,
+        fps: fps,
+        motionScale: motionScale,
+        guidingFrameNoise: guidingFrameNoise,
+        startFrameGuidance: startFrameGuidance,
         numFrames: numFrames,
         refinerModel: refinerModel,
         refinerStart: refinerStart,

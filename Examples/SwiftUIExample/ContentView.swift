@@ -134,7 +134,7 @@ struct ContentView: View {
                 steps: 20,
                 model: "sd_xl_base_1.0.safetensors",
                 sampler: SamplerType.dpm2a.rawValue,
-                cfgScale: 7.0
+                guidanceScale: 7.0
             )
             
             let images = try await client.generateImage(

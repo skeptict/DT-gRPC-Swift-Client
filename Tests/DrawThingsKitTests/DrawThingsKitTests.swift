@@ -9,13 +9,13 @@ final class DrawThingsKitTests: XCTestCase {
             height: 512,
             steps: 20,
             model: "sd_xl_base_1.0.safetensors",
-            cfgScale: 7.0
+            guidanceScale: 7.0
         )
         
         XCTAssertEqual(config.width, 512)
         XCTAssertEqual(config.height, 512)
         XCTAssertEqual(config.steps, 20)
-        XCTAssertEqual(config.cfgScale, 7.0)
+        XCTAssertEqual(config.guidanceScale, 7.0)
     }
     
     func testSamplerTypes() {

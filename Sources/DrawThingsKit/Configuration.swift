@@ -54,7 +54,7 @@ public struct DrawThingsConfiguration {
     public let steps: Int32
     public let model: String
     public let sampler: String
-    public let cfgScale: Float
+    public let guidanceScale: Float
     public let seed: Int64?
     public let clipSkip: Int32
     public let loras: [LoRAConfig]
@@ -71,6 +71,8 @@ public struct DrawThingsConfiguration {
     public let clipWeight: Float
     public let guidanceEmbed: Float
     public let speedUpWithGuidanceEmbed: Bool
+    public let cfgZeroStar: Bool
+    public let cfgZeroInitSteps: Int32
 
     // Mask/Inpaint parameters
     public let maskBlur: Float
@@ -126,7 +128,7 @@ public struct DrawThingsConfiguration {
 
     // Stage 2 parameters
     public let stage2Steps: Int32
-    public let stage2Cfg: Float
+    public let stage2Guidance: Float
     public let stage2Shift: Float
 
     // TEA Cache parameters
@@ -137,15 +139,14 @@ public struct DrawThingsConfiguration {
     public let teaCacheMaxSkipSteps: Int32
 
     // Causal inference parameters
-    public let causalInferenceEnabled: Bool
     public let causalInference: Int32
     public let causalInferencePad: Int32
 
     // Video parameters
-    public let fpsId: Int32
-    public let motionBucketId: Int32
-    public let condAug: Float
-    public let startFrameCfg: Float
+    public let fps: Int32
+    public let motionScale: Int32
+    public let guidingFrameNoise: Float
+    public let startFrameGuidance: Float
     public let numFrames: Int32
 
     // Refiner parameters
@@ -162,7 +163,7 @@ public struct DrawThingsConfiguration {
         steps: Int32 = 20,
         model: String = "sd_xl_base_1.0.safetensors",
         sampler: String = "dpm_2_a",
-        cfgScale: Float = 7.0,
+        guidanceScale: Float = 7.0,
         seed: Int64? = nil,
         clipSkip: Int32 = 1,
         loras: [LoRAConfig] = [],
@@ -175,6 +176,8 @@ public struct DrawThingsConfiguration {
         clipWeight: Float = 1.0,
         guidanceEmbed: Float = 3.5,
         speedUpWithGuidanceEmbed: Bool = true,
+        cfgZeroStar: Bool = false,
+        cfgZeroInitSteps: Int32 = 0,
         maskBlur: Float = 1.5,
         maskBlurOutset: Int32 = 0,
         preserveOriginalAfterInpaint: Bool = true,
@@ -212,20 +215,19 @@ public struct DrawThingsConfiguration {
         hiresFixHeight: Int32 = 0,
         hiresFixStrength: Float = 0.7,
         stage2Steps: Int32 = 10,
-        stage2Cfg: Float = 1.0,
+        stage2Guidance: Float = 1.0,
         stage2Shift: Float = 1.0,
         teaCache: Bool = false,
         teaCacheStart: Int32 = 5,
         teaCacheEnd: Int32 = -1,
         teaCacheThreshold: Float = 0.06,
         teaCacheMaxSkipSteps: Int32 = 3,
-        causalInferenceEnabled: Bool = false,
         causalInference: Int32 = 3,
         causalInferencePad: Int32 = 0,
-        fpsId: Int32 = 5,
-        motionBucketId: Int32 = 127,
-        condAug: Float = 0.02,
-        startFrameCfg: Float = 1.0,
+        fps: Int32 = 5,
+        motionScale: Int32 = 127,
+        guidingFrameNoise: Float = 0.02,
+        startFrameGuidance: Float = 1.0,
         numFrames: Int32 = 14,
         refinerModel: String? = nil,
         refinerStart: Float = 0.85,
@@ -237,7 +239,7 @@ public struct DrawThingsConfiguration {
         self.steps = steps
         self.model = model
         self.sampler = sampler
-        self.cfgScale = cfgScale
+        self.guidanceScale = guidanceScale
         self.seed = seed
         self.clipSkip = clipSkip
         self.loras = loras
@@ -250,6 +252,8 @@ public struct DrawThingsConfiguration {
         self.clipWeight = clipWeight
         self.guidanceEmbed = guidanceEmbed
         self.speedUpWithGuidanceEmbed = speedUpWithGuidanceEmbed
+        self.cfgZeroStar = cfgZeroStar
+        self.cfgZeroInitSteps = cfgZeroInitSteps
         self.maskBlur = maskBlur
         self.maskBlurOutset = maskBlurOutset
         self.preserveOriginalAfterInpaint = preserveOriginalAfterInpaint
@@ -287,20 +291,19 @@ public struct DrawThingsConfiguration {
         self.hiresFixHeight = hiresFixHeight
         self.hiresFixStrength = hiresFixStrength
         self.stage2Steps = stage2Steps
-        self.stage2Cfg = stage2Cfg
+        self.stage2Guidance = stage2Guidance
         self.stage2Shift = stage2Shift
         self.teaCache = teaCache
         self.teaCacheStart = teaCacheStart
         self.teaCacheEnd = teaCacheEnd
         self.teaCacheThreshold = teaCacheThreshold
         self.teaCacheMaxSkipSteps = teaCacheMaxSkipSteps
-        self.causalInferenceEnabled = causalInferenceEnabled
         self.causalInference = causalInference
         self.causalInferencePad = causalInferencePad
-        self.fpsId = fpsId
-        self.motionBucketId = motionBucketId
-        self.condAug = condAug
-        self.startFrameCfg = startFrameCfg
+        self.fps = fps
+        self.motionScale = motionScale
+        self.guidingFrameNoise = guidingFrameNoise
+        self.startFrameGuidance = startFrameGuidance
         self.numFrames = numFrames
         self.refinerModel = refinerModel
         self.refinerStart = refinerStart
@@ -320,7 +323,7 @@ public struct DrawThingsConfiguration {
         configT.steps = UInt32(steps)
         configT.model = model
         configT.sampler = mapSamplerToEnum(sampler)
-        configT.guidanceScale = cfgScale
+        configT.guidanceScale = guidanceScale
         configT.clipSkip = UInt32(clipSkip)
         configT.shift = shift
 
@@ -344,6 +347,8 @@ public struct DrawThingsConfiguration {
         configT.clipWeight = clipWeight
         configT.guidanceEmbed = guidanceEmbed
         configT.speedUpWithGuidanceEmbed = speedUpWithGuidanceEmbed
+        configT.cfgZeroStar = cfgZeroStar
+        configT.cfgZeroInitSteps = cfgZeroInitSteps
 
         // Mask/Inpaint parameters
         configT.maskBlur = maskBlur
@@ -398,7 +403,7 @@ public struct DrawThingsConfiguration {
 
         // Stage 2 parameters
         configT.stage2Steps = UInt32(stage2Steps)
-        configT.stage2Cfg = stage2Cfg
+        configT.stage2Cfg = stage2Guidance
         configT.stage2Shift = stage2Shift
 
         // TEA Cache parameters
@@ -409,15 +414,14 @@ public struct DrawThingsConfiguration {
         configT.teaCacheMaxSkipSteps = Int32(teaCacheMaxSkipSteps)
 
         // Causal inference parameters
-        configT.causalInferenceEnabled = causalInferenceEnabled
         configT.causalInference = Int32(causalInference)
         configT.causalInferencePad = Int32(causalInferencePad)
 
         // Video parameters
-        configT.fpsId = UInt32(fpsId)
-        configT.motionBucketId = UInt32(motionBucketId)
-        configT.condAug = condAug
-        configT.startFrameCfg = startFrameCfg
+        configT.fpsId = UInt32(fps)
+        configT.motionBucketId = UInt32(motionScale)
+        configT.condAug = guidingFrameNoise
+        configT.startFrameCfg = startFrameGuidance
         configT.numFrames = UInt32(numFrames)
 
         // Refiner parameters
