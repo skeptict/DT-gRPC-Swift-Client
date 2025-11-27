@@ -1,6 +1,6 @@
 //
 //  Config from JSON.swift
-//  DrawThingsKit
+//  DrawThingsClient
 //  These functions are for creating a DrawThingsConfiguration from JSON provided in a String
 
 /// Load configuration from JSON, applying only values that are present in the JSON

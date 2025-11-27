@@ -1,5 +1,5 @@
 import SwiftUI
-import DrawThingsKit
+import DrawThingsClient
 
 struct ContentView: View {
     @StateObject private var client: DrawThingsClient

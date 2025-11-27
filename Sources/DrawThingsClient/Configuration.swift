@@ -441,7 +441,7 @@ public struct DrawThingsConfiguration {
             controlT.globalAveragePooling = false
             controlT.downSamplingRate = 1.0
             controlT.targetBlocks = []
-            DrawThingsKitLogger.debug("Added ControlNet control: \(control.file)")
+            DrawThingsClientLogger.debug("Added ControlNet control: \(control.file)")
             return controlT
         }
 
@@ -459,7 +459,7 @@ public struct DrawThingsConfiguration {
             inpaintControl.targetBlocks = []
             inpaintControl.file = ""  // Empty file - mask is sent separately
             controlsArray.append(inpaintControl)
-            DrawThingsKitLogger.debug("Added inpaint control to configuration")
+            DrawThingsClientLogger.debug("Added inpaint control to configuration")
         }
 
         configT.controls = controlsArray

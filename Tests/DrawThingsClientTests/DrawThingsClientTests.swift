@@ -1,7 +1,7 @@
 import XCTest
-@testable import DrawThingsKit
+@testable import DrawThingsClient
 
-final class DrawThingsKitTests: XCTestCase {
+final class DrawThingsClientTests: XCTestCase {
     
     func testConfigurationCreation() throws {
         let config = DrawThingsConfiguration(
@@ -19,9 +19,9 @@ final class DrawThingsKitTests: XCTestCase {
     }
     
     func testSamplerTypes() {
-        XCTAssertEqual(SamplerType.ddim.rawValue, "ddim")
-        XCTAssertEqual(SamplerType.dpm2a.rawValue, "dpm_2_a")
-        XCTAssertEqual(SamplerType.eulerA.rawValue, "euler_a")
+        XCTAssertEqual(SamplerType.ddim.rawValue, 2)
+        XCTAssertEqual(SamplerType.eulera.rawValue, 1)
+        XCTAssertEqual(SamplerType.dpmpp2mkarras.rawValue, 0)
     }
     
     func testGenerationStageDescriptions() {

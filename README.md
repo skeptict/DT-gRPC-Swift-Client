@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="Assets/logo.png" alt="DrawThingsKit Logo" width="200"/>
+  <img src="Assets/logo.png" alt="DrawThingsClient Logo" width="200"/>
 </p>
 
-# DrawThingsKit
+# DrawThingsClient
 
-A Swift framework for interacting with Draw Things gRPC server, designed for easy integration with SwiftUI applications on macOS.
+A Swift client library for interacting with Draw Things gRPC server, designed for easy integration with SwiftUI applications on macOS.
 
 ## Features
 
@@ -65,7 +65,7 @@ To use this framework, you need to configure the Draw Things gRPC server with th
 
 ### Swift Package Manager
 
-Add DrawThingsKit to your project via Xcode:
+Add DrawThingsClient to your project via Xcode:
 
 1. File → Add Package Dependencies...
 2. Enter the repository URL
@@ -84,7 +84,7 @@ dependencies: [
 ### Basic Usage
 
 ```swift
-import DrawThingsKit
+import DrawThingsClient
 import SwiftUI
 
 struct ContentView: View {
@@ -444,7 +444,7 @@ print("Saved \(frames.count) frames to \(outputDirectory.path)")
 
 ## Architecture
 
-DrawThingsKit is built on top of:
+DrawThingsClient is built on top of:
 
 - **gRPC Swift 2**: Modern gRPC client with async/await support
 - **SwiftProtobuf**: Type-safe protocol buffer implementation
@@ -526,20 +526,20 @@ do {
 
 ## Logging & Debugging
 
-DrawThingsKit uses Apple's unified logging system (`os.log`) for diagnostic output. By default, logging is disabled in production.
+DrawThingsClient uses Apple's unified logging system (`os.log`) for diagnostic output. By default, logging is disabled in production.
 
 ### Enable Logging
 
 To enable logging for debugging:
 
 ```swift
-import DrawThingsKit
+import DrawThingsClient
 
 // Enable debug logging
-DrawThingsKitLogger.minimumLevel = .debug
+DrawThingsClientLogger.minimumLevel = .debug
 
 // Or set a higher threshold
-DrawThingsKitLogger.minimumLevel = .info  // Only info and above
+DrawThingsClientLogger.minimumLevel = .info  // Only info and above
 ```
 
 ### Log Levels
@@ -563,7 +563,7 @@ Logs can be viewed in:
 If you prefer plain log messages without emoji prefixes:
 
 ```swift
-DrawThingsKitLogger.useEmoji = false
+DrawThingsClientLogger.useEmoji = false
 ```
 
 ## Contributing

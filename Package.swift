@@ -2,15 +2,15 @@
 import PackageDescription
 
 let package = Package(
-    name: "DrawThingsKit",
+    name: "DrawThingsClient",
     platforms: [
         .macOS(.v14),
         .iOS(.v17)
     ],
     products: [
         .library(
-            name: "DrawThingsKit",
-            targets: ["DrawThingsKit"]
+            name: "DrawThingsClient",
+            targets: ["DrawThingsClient"]
         ),
     ],
     dependencies: [
@@ -20,7 +20,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "DrawThingsKit",
+            name: "DrawThingsClient",
             dependencies: [
                 .product(name: "GRPC", package: "grpc-swift"),
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
@@ -28,8 +28,8 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "DrawThingsKitTests",
-            dependencies: ["DrawThingsKit"]
+            name: "DrawThingsClientTests",
+            dependencies: ["DrawThingsClient"]
         ),
     ]
 )

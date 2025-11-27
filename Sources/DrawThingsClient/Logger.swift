@@ -1,9 +1,9 @@
 import Foundation
 import os.log
 
-/// Logging configuration for DrawThingsKit
-public struct DrawThingsKitLogger {
-    /// Log levels for DrawThingsKit
+/// Logging configuration for DrawThingsClient
+public struct DrawThingsClientLogger {
+    /// Log levels for DrawThingsClient
     public enum Level: Int, Comparable {
         case debug = 0
         case info = 1
@@ -35,7 +35,7 @@ public struct DrawThingsKitLogger {
     /// Whether to use emoji prefixes in log messages
     public static var useEmoji: Bool = true
 
-    private static let logger = os.Logger(subsystem: "com.drawthings.kit", category: "DrawThingsKit")
+    private static let logger = os.Logger(subsystem: "com.drawthings.client", category: "DrawThingsClient")
 
     /// Log a debug message
     static func debug(_ message: String) {
