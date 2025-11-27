@@ -139,6 +139,7 @@ public struct DrawThingsConfiguration {
     public let teaCacheMaxSkipSteps: Int32
 
     // Causal inference parameters
+    public let causalInferenceEnabled: Bool
     public let causalInference: Int32
     public let causalInferencePad: Int32
 
@@ -153,6 +154,20 @@ public struct DrawThingsConfiguration {
     public let refinerModel: String?
     public let refinerStart: Float
     public let zeroNegativePrompt: Bool
+
+    // Upscaler parameters
+    public let upscaler: String?
+
+    // Face restoration
+    public let faceRestoration: String?
+
+    // Configuration name
+    public let name: String?
+
+    // Separate text encoder prompts
+    public let clipLText: String?
+    public let openClipGText: String?
+    public let t5Text: String?
 
     // Seed mode
     public let seedMode: Int32
@@ -222,6 +237,7 @@ public struct DrawThingsConfiguration {
         teaCacheEnd: Int32 = -1,
         teaCacheThreshold: Float = 0.06,
         teaCacheMaxSkipSteps: Int32 = 3,
+        causalInferenceEnabled: Bool = false,
         causalInference: Int32 = 3,
         causalInferencePad: Int32 = 0,
         fps: Int32 = 5,
@@ -232,6 +248,12 @@ public struct DrawThingsConfiguration {
         refinerModel: String? = nil,
         refinerStart: Float = 0.85,
         zeroNegativePrompt: Bool = false,
+        upscaler: String? = nil,
+        faceRestoration: String? = nil,
+        name: String? = nil,
+        clipLText: String? = nil,
+        openClipGText: String? = nil,
+        t5Text: String? = nil,
         seedMode: Int32 = 2
     ) {
         self.width = width
@@ -298,6 +320,7 @@ public struct DrawThingsConfiguration {
         self.teaCacheEnd = teaCacheEnd
         self.teaCacheThreshold = teaCacheThreshold
         self.teaCacheMaxSkipSteps = teaCacheMaxSkipSteps
+        self.causalInferenceEnabled = causalInferenceEnabled
         self.causalInference = causalInference
         self.causalInferencePad = causalInferencePad
         self.fps = fps
@@ -308,6 +331,12 @@ public struct DrawThingsConfiguration {
         self.refinerModel = refinerModel
         self.refinerStart = refinerStart
         self.zeroNegativePrompt = zeroNegativePrompt
+        self.upscaler = upscaler
+        self.faceRestoration = faceRestoration
+        self.name = name
+        self.clipLText = clipLText
+        self.openClipGText = openClipGText
+        self.t5Text = t5Text
         self.seedMode = seedMode
     }
 
@@ -401,6 +430,12 @@ public struct DrawThingsConfiguration {
         configT.hiresFixStartHeight = UInt16(hiresFixHeight / 64)
         configT.hiresFixStrength = hiresFixStrength
 
+        // Upscaler
+        configT.upscaler = upscaler
+
+        // Face restoration
+        configT.faceRestoration = faceRestoration
+
         // Stage 2 parameters
         configT.stage2Steps = UInt32(stage2Steps)
         configT.stage2Cfg = stage2Guidance
@@ -414,6 +449,7 @@ public struct DrawThingsConfiguration {
         configT.teaCacheMaxSkipSteps = Int32(teaCacheMaxSkipSteps)
 
         // Causal inference parameters
+        configT.causalInferenceEnabled = causalInferenceEnabled
         configT.causalInference = Int32(causalInference)
         configT.causalInferencePad = Int32(causalInferencePad)
 
@@ -428,6 +464,14 @@ public struct DrawThingsConfiguration {
         configT.refinerModel = refinerModel
         configT.refinerStart = refinerStart
         configT.zeroNegativePrompt = zeroNegativePrompt
+
+        // Configuration name
+        configT.name = name
+
+        // Separate text encoder prompts
+        configT.clipLText = clipLText
+        configT.openClipGText = openClipGText
+        configT.t5Text = t5Text
 
         // Add user-provided controls (ControlNet)
         var controlsArray: [ControlT] = controls.map { control in
