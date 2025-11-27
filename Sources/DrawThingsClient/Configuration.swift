@@ -4,21 +4,12 @@ import FlatBuffers
 public struct LoRAConfig {
     public let file: String
     public let weight: Float
-    public let mode: String  // "all", "base", or "refiner"
+    public let mode: LoRAMode
 
-    public init(file: String, weight: Float = 1.0, mode: String = "all") {
+    public init(file: String, weight: Float = 1.0, mode: LoRAMode = .all) {
         self.file = file
         self.weight = weight
         self.mode = mode
-    }
-
-    // Map mode string to FlatBuffer enum
-    internal func modeEnum() -> LoRAMode {
-        switch mode.lowercased() {
-        case "base": return .base
-        case "refiner": return .refiner
-        default: return .all
-        }
     }
 }
 
@@ -27,23 +18,14 @@ public struct ControlConfig {
     public let weight: Float
     public let guidanceStart: Float
     public let guidanceEnd: Float
-    public let controlMode: String  // "balanced", "prompt", or "control"
+    public let controlMode: ControlMode
 
-    public init(file: String, weight: Float = 1.0, guidanceStart: Float = 0.0, guidanceEnd: Float = 1.0, controlMode: String = "balanced") {
+    public init(file: String, weight: Float = 1.0, guidanceStart: Float = 0.0, guidanceEnd: Float = 1.0, controlMode: ControlMode = .balanced) {
         self.file = file
         self.weight = weight
         self.guidanceStart = guidanceStart
         self.guidanceEnd = guidanceEnd
         self.controlMode = controlMode
-    }
-
-    // Map mode string to FlatBuffer enum
-    internal func controlModeEnum() -> ControlMode {
-        switch controlMode.lowercased() {
-        case "prompt": return .prompt
-        case "control": return .control
-        default: return .balanced
-        }
     }
 }
 
@@ -53,7 +35,7 @@ public struct DrawThingsConfiguration {
     public let height: Int32
     public let steps: Int32
     public let model: String
-    public let sampler: String
+    public let sampler: SamplerType
     public let guidanceScale: Float
     public let seed: Int64?
     public let clipSkip: Int32
@@ -177,7 +159,7 @@ public struct DrawThingsConfiguration {
         height: Int32 = 512,
         steps: Int32 = 20,
         model: String = "sd_xl_base_1.0.safetensors",
-        sampler: String = "dpm_2_a",
+        sampler: SamplerType = .dpmpp2mkarras,
         guidanceScale: Float = 7.0,
         seed: Int64? = nil,
         clipSkip: Int32 = 1,
@@ -351,7 +333,7 @@ public struct DrawThingsConfiguration {
         // Core generation parameters
         configT.steps = UInt32(steps)
         configT.model = model
-        configT.sampler = mapSamplerToEnum(sampler)
+        configT.sampler = sampler
         configT.guidanceScale = guidanceScale
         configT.clipSkip = UInt32(clipSkip)
         configT.shift = shift
@@ -480,7 +462,7 @@ public struct DrawThingsConfiguration {
             controlT.weight = control.weight
             controlT.guidanceStart = control.guidanceStart
             controlT.guidanceEnd = control.guidanceEnd
-            controlT.controlMode = control.controlModeEnum()
+            controlT.controlMode = control.controlMode
             controlT.noPrompt = false
             controlT.globalAveragePooling = false
             controlT.downSamplingRate = 1.0
@@ -513,7 +495,7 @@ public struct DrawThingsConfiguration {
             let loraT = LoRAT()
             loraT.file = lora.file
             loraT.weight = lora.weight
-            loraT.mode = lora.modeEnum()
+            loraT.mode = lora.mode
             return loraT
         }
 
@@ -534,52 +516,6 @@ public struct DrawThingsConfiguration {
         case 0: return .legacy
         case 1, 2: return .torchcpucompatible
         default: return .torchcpucompatible
-        }
-    }
-
-    // Map sampler string to FlatBuffer enum value (using the generated SamplerType from config_generated.swift)
-    private func mapSamplerToEnum(_ sampler: String) -> SamplerType {
-        switch sampler.lowercased().replacingOccurrences(of: "_", with: "") {
-        case "dpmpp2mkarras":
-            return .dpmpp2mkarras
-        case "eulera":
-            return .eulera
-        case "ddim":
-            return .ddim
-        case "pndm", "plms":
-            return .plms
-        case "dpmppsdekarras":
-            return .dpmppsdekarras
-        case "unipc":
-            return .unipc
-        case "lcm":
-            return .lcm
-        case "eulerasubstep":
-            return .eulerasubstep
-        case "dpmppsdesubstep":
-            return .dpmppsdesubstep
-        case "tcd":
-            return .tcd
-        case "euleratrailing":
-            return .euleratrailing
-        case "dpmppsdetrailing":
-            return .dpmppsdetrailing
-        case "dpmpp2mays":
-            return .dpmpp2mays
-        case "euleraays":
-            return .euleraays
-        case "dpmppsdeays":
-            return .dpmppsdeays
-        case "dpmpp2mtrailing":
-            return .dpmpp2mtrailing
-        case "ddimtrailing":
-            return .ddimtrailing
-        case "unipctrailing":
-            return .unipctrailing
-        case "unipcays":
-            return .unipcays
-        default:
-            return .dpmpp2mkarras  // Default to DPMPP2MKarras
         }
     }
 }

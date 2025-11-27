@@ -133,7 +133,7 @@ struct ContentView: View {
                 height: 512,
                 steps: 20,
                 model: "sd_xl_base_1.0.safetensors",
-                sampler: SamplerType.dpm2a.rawValue,
+                sampler: .dpmpp2mkarras,
                 guidanceScale: 7.0
             )
             

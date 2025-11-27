@@ -33,12 +33,10 @@ private func loadDrawThingsConfig(for key: String) async -> DrawThingsConfigurat
         return nil
     }
     
-    // Sampler handling - convert from int or string
-    var samplerStr = "DPMPP_2M_KARRAS"
+    // Sampler handling - convert from int to SamplerType enum
+    var samplerType: SamplerType = .dpmpp2mkarras
     if let samplerInt = json["sampler"] as? Int {
-        samplerStr = mapSamplerIntToString(samplerInt)
-    } else if let sampler = json["sampler"] as? String {
-        samplerStr = sampler
+        samplerType = mapSamplerIntToEnum(samplerInt)
     }
     
     // Text Guidance - guidanceScale in JSON
@@ -50,7 +48,8 @@ private func loadDrawThingsConfig(for key: String) async -> DrawThingsConfigurat
         for loraDict in lorasArray {
             if let file = loraDict["file"] as? String {
                 let weight = Float(loraDict["weight"] as? Double ?? 1.0)
-                let mode = loraDict["mode"] as? String ?? "all"
+                let modeInt = loraDict["mode"] as? Int ?? 0
+                let mode = mapLoRAModeIntToEnum(modeInt)
                 loras.append(LoRAConfig(file: file, weight: weight, mode: mode))
             }
         }
@@ -64,7 +63,8 @@ private func loadDrawThingsConfig(for key: String) async -> DrawThingsConfigurat
                 let weight = Float(controlDict["weight"] as? Double ?? 1.0)
                 let guidanceStart = Float(controlDict["guidanceStart"] as? Double ?? 0.0)
                 let guidanceEnd = Float(controlDict["guidanceEnd"] as? Double ?? 1.0)
-                let controlMode = controlDict["controlImportance"] as? String ?? "balanced"
+                let controlModeInt = controlDict["controlImportance"] as? Int ?? 0
+                let controlMode = mapControlModeIntToEnum(controlModeInt)
                 controls.append(ControlConfig(
                     file: file,
                     weight: weight,
@@ -181,7 +181,7 @@ private func loadDrawThingsConfig(for key: String) async -> DrawThingsConfigurat
     print("✅ Parsed config:")
     print("   Model: \(model)")
     print("   Steps: \(steps), CFG: \(cfgScale), Size: \(width)x\(height)")
-    print("   Sampler: \(samplerStr), Shift: \(shift), Strength: \(strength)")
+    print("   Sampler: \(samplerType) (rawValue: \(samplerType.rawValue)), Shift: \(shift), Strength: \(strength)")
     print("   LoRAs: \(loras.count), Controls: \(controls.count)")
     
     // Create DrawThingsConfiguration with ALL parameters
@@ -190,7 +190,7 @@ private func loadDrawThingsConfig(for key: String) async -> DrawThingsConfigurat
         height: Int32(height),
         steps: Int32(steps),
         model: model,
-        sampler: samplerStr,
+        sampler: samplerType,
         guidanceScale: Float(cfgScale),
         seed: nil,
         clipSkip: clipSkip,
@@ -266,29 +266,51 @@ private func loadDrawThingsConfig(for key: String) async -> DrawThingsConfigurat
     return config
 }
 
-/// Map DrawThings sampler integer to string name
+/// Map DrawThings sampler integer to SamplerType enum
 /// Based on SamplerType enum from DrawThings FlatBuffers schema
-private func mapSamplerIntToString(_ samplerInt: Int) -> String {
+private func mapSamplerIntToEnum(_ samplerInt: Int) -> SamplerType {
     switch samplerInt {
-    case 0: return "dpmpp_2m_karras"
-    case 1: return "euler_a"
-    case 2: return "ddim"
-    case 3: return "plms"
-    case 4: return "dpmpp_sde_karras"
-    case 5: return "unipc"
-    case 6: return "lcm"
-    case 7: return "euler_a_substep"
-    case 8: return "dpmpp_sde_substep"
-    case 9: return "tcd"
-    case 10: return "euler_a_trailing"
-    case 11: return "dpmpp_sde_trailing"
-    case 12: return "dpmpp_2m_ays"
-    case 13: return "euler_a_ays"
-    case 14: return "dpmpp_sde_ays"
-    case 15: return "dpmpp_2m_trailing"
-    case 16: return "ddim_trailing"
-    case 17: return "unipc_trailing"
-    case 18: return "unipc_ays"
-    default: return "dpmpp_2m_karras"  // Default to case 0
+    case 0: return .dpmpp2mkarras
+    case 1: return .eulera
+    case 2: return .ddim
+    case 3: return .plms
+    case 4: return .dpmppsdekarras
+    case 5: return .unipc
+    case 6: return .lcm
+    case 7: return .eulerasubstep
+    case 8: return .dpmppsdesubstep
+    case 9: return .tcd
+    case 10: return .euleratrailing
+    case 11: return .dpmppsdetrailing
+    case 12: return .dpmpp2mays
+    case 13: return .euleraays
+    case 14: return .dpmppsdeays
+    case 15: return .dpmpp2mtrailing
+    case 16: return .ddimtrailing
+    case 17: return .unipctrailing
+    case 18: return .unipcays
+    default: return .dpmpp2mkarras  // Default to case 0
+    }
+}
+
+/// Map DrawThings LoRA mode integer to LoRAMode enum
+/// Based on LoRAMode enum from DrawThings FlatBuffers schema
+private func mapLoRAModeIntToEnum(_ modeInt: Int) -> LoRAMode {
+    switch modeInt {
+    case 0: return .all
+    case 1: return .base
+    case 2: return .refiner
+    default: return .all  // Default to case 0
+    }
+}
+
+/// Map DrawThings control mode integer to ControlMode enum
+/// Based on ControlMode enum from DrawThings FlatBuffers schema
+private func mapControlModeIntToEnum(_ modeInt: Int) -> ControlMode {
+    switch modeInt {
+    case 0: return .balanced
+    case 1: return .prompt
+    case 2: return .control
+    default: return .balanced  // Default to case 0
     }
 }

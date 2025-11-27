@@ -150,7 +150,7 @@ let config = DrawThingsConfiguration(
     height: 1024,
     steps: 30,
     model: "sd_xl_base_1.0.safetensors",
-    sampler: SamplerType.dpm2a.rawValue,
+    sampler: .eulera,
     guidanceScale: 7.5,
     seed: 12345,
     clipSkip: 2
