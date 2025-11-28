@@ -387,7 +387,9 @@ public struct ImageHelpers {
                     for i in 0..<pixelCount {
                         let float16Bits = float16Ptr[i]
                         let float16Value = Float16(bitPattern: float16Bits)
-                        let uint8Value = UInt8(clamping: Int((Float(float16Value) + 1.0) * 127.5))
+                        let floatValue = Float(float16Value)
+                        // Handle NaN/infinity by defaulting to mid-gray
+                        let uint8Value = UInt8(clamping: Int(floatValue.isFinite ? (floatValue + 1.0) * 127.5 : 127.5))
                         uint8Ptr[i] = uint8Value
                     }
                 }

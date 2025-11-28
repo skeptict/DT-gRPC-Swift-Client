@@ -39,15 +39,16 @@ public class DrawThingsClient: ObservableObject {
         
         var imageData: Data?
         var maskData: Data?
-        
+
+        // Convert images to DTTensor format (required by Draw Things server)
         if let image = image {
-            imageData = try ImageHelpers.convertImageToData(image)
+            imageData = try ImageHelpers.nsImageToDTTensor(image, forceRGB: true)
         }
-        
+
         if let mask = mask {
-            maskData = try ImageHelpers.convertImageToData(mask)
+            maskData = try ImageHelpers.nsImageToDTTensor(mask, forceRGB: true)
         }
-        
+
         let resultData = try await service.generateImage(
             prompt: prompt,
             negativePrompt: negativePrompt,
@@ -60,10 +61,11 @@ public class DrawThingsClient: ObservableObject {
                 }
             }
         )
-        
+
         currentProgress = nil
-        
-        return try resultData.map { try ImageHelpers.dataToNSImage($0) }
+
+        // Convert DTTensor results back to NSImage
+        return try resultData.map { try ImageHelpers.dtTensorToNSImage($0) }
     }
     
     private func updateProgress(_ signpost: ImageGenerationSignpostProto?) {
