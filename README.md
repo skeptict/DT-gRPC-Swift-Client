@@ -61,6 +61,120 @@ To use this framework, you need to configure the Draw Things gRPC server with th
    - This allows the framework to query available models, samplers, and other metadata
    - Required for proper initialization and model selection
 
+## Important: Image Data Formats
+
+Draw Things uses a custom tensor format (DTTensor) for image data exchange, **not** standard image formats like PNG or JPEG. Understanding this is critical for successful integration.
+
+### DTTensor Format
+
+The DTTensor format consists of:
+- **68-byte header** containing dimensions, channel count, and compression flag
+- **Float16 RGB pixel data** with values in range [-1, 1]
+
+The `ImageHelpers` class provides conversion utilities:
+
+```swift
+// Convert NSImage to DTTensor (for sending to Draw Things)
+let tensorData = try ImageHelpers.nsImageToDTTensor(image, forceRGB: true)
+
+// Convert DTTensor to NSImage (for receiving from Draw Things)
+let image = try ImageHelpers.dtTensorToNSImage(tensorData)
+```
+
+### When to Use Each Format
+
+| Data Type | Format Required | Conversion Method |
+|-----------|-----------------|-------------------|
+| **Hints/Moodboard images** | DTTensor | `nsImageToDTTensor()` |
+| **ControlNet input images** | DTTensor | `nsImageToDTTensor()` |
+| **Canvas image (img2img)** | DTTensor | `nsImageToDTTensor()` |
+| **Mask image (inpainting)** | DTTensor | `nsImageToDTTensor()` |
+| **Result images returned** | DTTensor | `dtTensorToNSImage()` |
+| **Preview images returned** | DTTensor | `dtTensorToNSImage()` |
+
+### Common Pitfalls
+
+1. **Sending PNG data instead of DTTensor**: The server will crash or return no results if you send PNG/JPEG data where DTTensor is expected.
+
+2. **Saving raw result data as image files**: Result images are DTTensor format. Saving them directly as `.png` files will create corrupted files. Always convert with `dtTensorToNSImage()` first.
+
+3. **NaN/Infinity in tensor data**: The `dtTensorToNSImage()` function handles NaN/infinity Float16 values by defaulting to mid-gray. This prevents crashes when processing malformed data.
+
+### Example: Complete img2img Flow
+
+```swift
+// 1. Load source image
+let sourceImage = NSImage(contentsOf: sourceURL)!
+
+// 2. Convert to DTTensor for sending
+let canvasData = try ImageHelpers.nsImageToDTTensor(sourceImage, forceRGB: true)
+
+// 3. Generate with img2img
+let results = try await service.generateImage(
+    prompt: "Transform this image",
+    configuration: configData,
+    image: canvasData  // DTTensor format, NOT PNG
+)
+
+// 4. Convert results back to images
+for resultData in results {
+    let resultImage = try ImageHelpers.dtTensorToNSImage(resultData)
+    // Now you can save as PNG, display, etc.
+}
+```
+
+## Configuration JSON Handling
+
+When parsing Draw Things configuration JSON exports, be aware of these edge cases:
+
+### Empty String vs Nil
+
+Draw Things exports empty optional fields as empty strings (`""`), not `null`. Treat empty strings as nil for these fields:
+
+| Field | Empty String Means |
+|-------|-------------------|
+| `upscaler` | No upscaler (use default) |
+| `faceRestoration` | No face restoration |
+| `refinerModel` | No refiner model |
+
+**Warning**: If you pass an empty string for `upscaler`, Draw Things may use a default 4x upscaler, resulting in unexpected 4x larger output images.
+
+### Control Configuration
+
+Draw Things JSON exports use `controlImportance` (string) while the FlatBuffer protocol uses `controlMode` (integer):
+
+| JSON `controlImportance` | Protocol `controlMode` |
+|--------------------------|----------------------|
+| `"balanced"` | `0` |
+| `"prompt"` | `1` |
+| `"control"` | `2` |
+
+### Sampler Values
+
+Samplers are represented as integers in the configuration:
+
+| Sampler Name | Integer Value |
+|--------------|---------------|
+| `dpmpp2mkarras` | `0` |
+| `eulera` | `1` |
+| `ddim` | `2` |
+| `plms` | `3` |
+| `dpmppsdekarras` | `4` |
+| `unipc` | `5` |
+| `lcm` | `6` |
+| `eulerasubstep` | `7` |
+| `dpmppsdesubstep` | `8` |
+| `tcd` | `9` |
+| `euleratrailing` | `10` |
+| `dpmppsdetrailing` | `11` |
+| `dpmpp2mays` | `12` |
+| `euleraays` | `13` |
+| `dpmppsdeays` | `14` |
+| `dpmpp2mtrailing` | `15` |
+| `ddimtrailing` | `16` |
+| `unipctrailing` | `17` |
+| `unipcays` | `18` |
+
 ## Installation
 
 ### Swift Package Manager
@@ -80,6 +194,21 @@ dependencies: [
 ```
 
 ## Quick Start
+
+### API Levels
+
+This library provides two API levels:
+
+| API | Class | Use Case |
+|-----|-------|----------|
+| **High-level** | `DrawThingsClient` | Simple integration, handles DTTensor conversion automatically, returns `[NSImage]` |
+| **Low-level** | `DrawThingsService` | Full control, requires manual DTTensor conversion, supports hints/controls, returns `[Data]` |
+
+For most use cases, start with `DrawThingsClient`. Use `DrawThingsService` when you need:
+- Hints/moodboard images
+- ControlNet support
+- Progress callbacks with preview images
+- Custom handling of raw tensor data
 
 ### Basic Usage
 
@@ -160,17 +289,38 @@ See ./Examples/Config from JSON.swift within this project for usable functions w
 
 ### Image-to-Image Generation
 
+Using the high-level `DrawThingsClient` API (handles DTTensor conversion automatically):
+
 ```swift
 let inputImage = NSImage(named: "input.jpg")!
 
 let images = try await client.generateImage(
     prompt: "Transform this into a watercolor painting",
     configuration: config,
-    image: inputImage
+    image: inputImage  // NSImage - converted to DTTensor internally
 )
 ```
 
+Using the lower-level `DrawThingsService` API (requires manual DTTensor conversion):
+
+```swift
+let inputImage = NSImage(named: "input.jpg")!
+let imageData = try ImageHelpers.nsImageToDTTensor(inputImage, forceRGB: true)
+let configData = try config.toFlatBufferData()
+
+let resultData = try await service.generateImage(
+    prompt: "Transform this into a watercolor painting",
+    configuration: configData,
+    image: imageData  // Must be DTTensor format
+)
+
+// Convert results back to NSImage
+let images = try resultData.map { try ImageHelpers.dtTensorToNSImage($0) }
+```
+
 ### Inpainting with Mask
+
+Using the high-level `DrawThingsClient` API:
 
 ```swift
 let inputImage = NSImage(named: "photo.jpg")!
@@ -182,6 +332,26 @@ let images = try await client.generateImage(
     image: inputImage,
     mask: maskImage
 )
+```
+
+Using the lower-level `DrawThingsService` API:
+
+```swift
+let inputImage = NSImage(named: "photo.jpg")!
+let maskImage = NSImage(named: "mask.png")!
+
+let imageData = try ImageHelpers.nsImageToDTTensor(inputImage, forceRGB: true)
+let maskData = try ImageHelpers.nsImageToDTTensor(maskImage, forceRGB: true)
+let configData = try config.toFlatBufferData()
+
+let resultData = try await service.generateImage(
+    prompt: "A cat sitting in the masked area",
+    configuration: configData,
+    image: imageData,
+    mask: maskData
+)
+
+let images = try resultData.map { try ImageHelpers.dtTensorToNSImage($0) }
 ```
 
 ### Moodboard / Reference Images
