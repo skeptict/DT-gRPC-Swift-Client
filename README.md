@@ -4,7 +4,7 @@
 
 # DrawThingsClient
 
-A Swift client library for interacting with Draw Things gRPC server, designed for easy integration with SwiftUI applications on macOS.
+A Swift client library for interacting with Draw Things gRPC server, designed for easy integration with SwiftUI applications on macOS and iOS.
 
 ## Features
 
@@ -74,40 +74,42 @@ The DTTensor format consists of:
 The `ImageHelpers` class provides conversion utilities:
 
 ```swift
-// Convert NSImage to DTTensor (for sending to Draw Things)
-let tensorData = try ImageHelpers.nsImageToDTTensor(image, forceRGB: true)
+// Convert PlatformImage to DTTensor (for sending to Draw Things)
+let tensorData = try ImageHelpers.imageToDTTensor(image, forceRGB: true)
 
-// Convert DTTensor to NSImage (for receiving from Draw Things)
-let image = try ImageHelpers.dtTensorToNSImage(tensorData)
+// Convert DTTensor to PlatformImage (for receiving from Draw Things)
+let image = try ImageHelpers.dtTensorToImage(tensorData)
 ```
+
+**Note:** `PlatformImage` is a type alias that resolves to `NSImage` on macOS and `UIImage` on iOS.
 
 ### When to Use Each Format
 
 | Data Type | Format Required | Conversion Method |
 |-----------|-----------------|-------------------|
-| **Hints/Moodboard images** | DTTensor | `nsImageToDTTensor()` |
-| **ControlNet input images** | DTTensor | `nsImageToDTTensor()` |
-| **Canvas image (img2img)** | DTTensor | `nsImageToDTTensor()` |
-| **Mask image (inpainting)** | DTTensor | `nsImageToDTTensor()` |
-| **Result images returned** | DTTensor | `dtTensorToNSImage()` |
-| **Preview images returned** | DTTensor | `dtTensorToNSImage()` |
+| **Hints/Moodboard images** | DTTensor | `imageToDTTensor()` |
+| **ControlNet input images** | DTTensor | `imageToDTTensor()` |
+| **Canvas image (img2img)** | DTTensor | `imageToDTTensor()` |
+| **Mask image (inpainting)** | DTTensor | `imageToDTTensor()` |
+| **Result images returned** | DTTensor | `dtTensorToImage()` |
+| **Preview images returned** | DTTensor | `dtTensorToImage()` |
 
 ### Common Pitfalls
 
 1. **Sending PNG data instead of DTTensor**: The server will crash or return no results if you send PNG/JPEG data where DTTensor is expected.
 
-2. **Saving raw result data as image files**: Result images are DTTensor format. Saving them directly as `.png` files will create corrupted files. Always convert with `dtTensorToNSImage()` first.
+2. **Saving raw result data as image files**: Result images are DTTensor format. Saving them directly as `.png` files will create corrupted files. Always convert with `dtTensorToImage()` first.
 
-3. **NaN/Infinity in tensor data**: The `dtTensorToNSImage()` function handles NaN/infinity Float16 values by defaulting to mid-gray. This prevents crashes when processing malformed data.
+3. **NaN/Infinity in tensor data**: The `dtTensorToImage()` function handles NaN/infinity Float16 values by defaulting to mid-gray. This prevents crashes when processing malformed data.
 
 ### Example: Complete img2img Flow
 
 ```swift
 // 1. Load source image
-let sourceImage = NSImage(contentsOf: sourceURL)!
+let sourceImage = PlatformImage(contentsOf: sourceURL)!  // NSImage on macOS, UIImage on iOS
 
 // 2. Convert to DTTensor for sending
-let canvasData = try ImageHelpers.nsImageToDTTensor(sourceImage, forceRGB: true)
+let canvasData = try ImageHelpers.imageToDTTensor(sourceImage, forceRGB: true)
 
 // 3. Generate with img2img
 let results = try await service.generateImage(
@@ -118,7 +120,7 @@ let results = try await service.generateImage(
 
 // 4. Convert results back to images
 for resultData in results {
-    let resultImage = try ImageHelpers.dtTensorToNSImage(resultData)
+    let resultImage = try ImageHelpers.dtTensorToImage(resultData)
     // Now you can save as PNG, display, etc.
 }
 ```
@@ -611,6 +613,44 @@ print("Saved \(frames.count) frames to \(outputDirectory.path)")
 // Use external tools to create video from frames:
 // ffmpeg -framerate 8 -i frame_%03d.png -c:v libx264 -pix_fmt yuv420p output.mp4
 ```
+
+## Cross-Platform Support
+
+DrawThingsClient supports both macOS and iOS. The library provides cross-platform abstractions for image handling:
+
+### Platform Types
+
+| Type | macOS | iOS |
+|------|-------|-----|
+| `PlatformImage` | `NSImage` | `UIImage` |
+| `PlatformColor` | `NSColor` | `UIColor` |
+
+### Cross-Platform Image Helpers
+
+```swift
+// Works on both macOS and iOS
+let image: PlatformImage = ...
+
+// Convert to DTTensor
+let tensorData = try ImageHelpers.imageToDTTensor(image, forceRGB: true)
+
+// Convert from DTTensor
+let resultImage = try ImageHelpers.dtTensorToImage(tensorData)
+
+// Other cross-platform utilities
+let resized = ImageHelpers.resizeImage(image, to: CGSize(width: 512, height: 512))
+let scaled = ImageHelpers.scaleImageToCanvas(image, canvasWidth: 1024, canvasHeight: 1024, backgroundColor: nil)
+let hasAlpha = ImageHelpers.hasTransparency(image)
+```
+
+### Legacy macOS Methods
+
+For backward compatibility, the following deprecated methods are still available on macOS:
+- `nsImageToDTTensor()` → use `imageToDTTensor()` instead
+- `dtTensorToNSImage()` → use `dtTensorToImage()` instead
+- `dataToNSImage()` → use `dataToImage()` instead
+
+---
 
 ## Architecture
 
