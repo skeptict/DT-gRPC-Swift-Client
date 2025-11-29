@@ -447,9 +447,10 @@ public struct ImageHelpers {
             throw ImageError.conversionFailed
         }
 
-        let mutableData = rgbData
+        // Use CFData to ensure the data stays alive for the lifetime of the CGImage
+        let cfData = rgbData as CFData
 
-        guard let provider = CGDataProvider(data: mutableData as CFData),
+        guard let provider = CGDataProvider(data: cfData),
               let cgImage = CGImage(
                 width: width,
                 height: height,
@@ -467,12 +468,15 @@ public struct ImageHelpers {
         }
 
         #if os(macOS)
-        let image = NSImage(cgImage: cgImage, size: NSSize(width: width, height: height))
+        return NSImage(cgImage: cgImage, size: NSSize(width: width, height: height))
         #else
-        let image = UIImage(cgImage: cgImage)
+        // On iOS, we need to render the CGImage to a new context to ensure
+        // the pixel data is copied and doesn't depend on the original data provider
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height))
+        return renderer.image { context in
+            context.cgContext.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
         #endif
-
-        return image
     }
 
     // MARK: - Transparency Helpers
