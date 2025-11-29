@@ -30,129 +30,137 @@ public struct ControlConfig {
 }
 
 public struct DrawThingsConfiguration {
-    // Core parameters
-    public let width: Int32
-    public let height: Int32
-    public let steps: Int32
-    public let model: String
-    public let sampler: SamplerType
-    public let guidanceScale: Float
-    public let seed: Int64?
-    public let clipSkip: Int32
-    public let loras: [LoRAConfig]
-    public let controls: [ControlConfig]
-    public let shift: Float
+    // Core parameters (width/height must be multiples of 64)
+    public var width: Int32 = 512 {
+        didSet { width = (width / 64) * 64 }
+    }
+    public var height: Int32 = 512 {
+        didSet { height = (height / 64) * 64 }
+    }
+    public var steps: Int32
+    public var model: String
+    public var sampler: SamplerType
+    public var guidanceScale: Float
+    public var seed: Int64?
+    public var clipSkip: Int32
+    public var loras: [LoRAConfig]
+    public var controls: [ControlConfig]
+    public var shift: Float
 
     // Batch parameters
-    public let batchCount: Int32
-    public let batchSize: Int32
-    public let strength: Float
+    public var batchCount: Int32
+    public var batchSize: Int32
+    public var strength: Float
 
     // Guidance parameters
-    public let imageGuidanceScale: Float
-    public let clipWeight: Float
-    public let guidanceEmbed: Float
-    public let speedUpWithGuidanceEmbed: Bool
-    public let cfgZeroStar: Bool
-    public let cfgZeroInitSteps: Int32
+    public var imageGuidanceScale: Float
+    public var clipWeight: Float
+    public var guidanceEmbed: Float
+    public var speedUpWithGuidanceEmbed: Bool
+    public var cfgZeroStar: Bool
+    public var cfgZeroInitSteps: Int32
 
     // Mask/Inpaint parameters
-    public let maskBlur: Float
-    public let maskBlurOutset: Int32
-    public let preserveOriginalAfterInpaint: Bool
-    public let enableInpainting: Bool  // When true, adds inpaint control to enable mask-based inpainting
+    public var maskBlur: Float
+    public var maskBlurOutset: Int32
+    public var preserveOriginalAfterInpaint: Bool
+    public var enableInpainting: Bool  // When true, adds inpaint control to enable mask-based inpainting
 
     // Quality parameters
-    public let sharpness: Float
-    public let stochasticSamplingGamma: Float
-    public let aestheticScore: Float
-    public let negativeAestheticScore: Float
+    public var sharpness: Float
+    public var stochasticSamplingGamma: Float
+    public var aestheticScore: Float
+    public var negativeAestheticScore: Float
 
     // Image prior parameters
-    public let negativePromptForImagePrior: Bool
-    public let imagePriorSteps: Int32
+    public var negativePromptForImagePrior: Bool
+    public var imagePriorSteps: Int32
 
     // Crop/Size parameters
-    public let cropTop: Int32
-    public let cropLeft: Int32
-    public let originalImageHeight: Int32
-    public let originalImageWidth: Int32
-    public let targetImageHeight: Int32
-    public let targetImageWidth: Int32
-    public let negativeOriginalImageHeight: Int32
-    public let negativeOriginalImageWidth: Int32
+    public var cropTop: Int32
+    public var cropLeft: Int32
+    public var originalImageHeight: Int32
+    public var originalImageWidth: Int32
+    public var targetImageHeight: Int32
+    public var targetImageWidth: Int32
+    public var negativeOriginalImageHeight: Int32
+    public var negativeOriginalImageWidth: Int32
 
     // Upscaler parameters
-    public let upscalerScaleFactor: Int32
+    public var upscalerScaleFactor: Int32
 
     // Text encoder parameters
-    public let resolutionDependentShift: Bool
-    public let t5TextEncoder: Bool
-    public let separateClipL: Bool
-    public let separateOpenClipG: Bool
-    public let separateT5: Bool
+    public var resolutionDependentShift: Bool
+    public var t5TextEncoder: Bool
+    public var separateClipL: Bool
+    public var separateOpenClipG: Bool
+    public var separateT5: Bool
 
     // Tiled parameters
-    public let tiledDiffusion: Bool
-    public let diffusionTileWidth: Int32
-    public let diffusionTileHeight: Int32
-    public let diffusionTileOverlap: Int32
-    public let tiledDecoding: Bool
-    public let decodingTileWidth: Int32
-    public let decodingTileHeight: Int32
-    public let decodingTileOverlap: Int32
+    public var tiledDiffusion: Bool
+    public var diffusionTileWidth: Int32
+    public var diffusionTileHeight: Int32
+    public var diffusionTileOverlap: Int32
+    public var tiledDecoding: Bool
+    public var decodingTileWidth: Int32
+    public var decodingTileHeight: Int32
+    public var decodingTileOverlap: Int32
 
-    // HiRes Fix parameters
-    public let hiresFix: Bool
-    public let hiresFixWidth: Int32
-    public let hiresFixHeight: Int32
-    public let hiresFixStrength: Float
+    // HiRes Fix parameters (width/height must be multiples of 64)
+    public var hiresFix: Bool
+    public var hiresFixWidth: Int32 = 0 {
+        didSet { hiresFixWidth = (hiresFixWidth / 64) * 64 }
+    }
+    public var hiresFixHeight: Int32 = 0 {
+        didSet { hiresFixHeight = (hiresFixHeight / 64) * 64 }
+    }
+    public var hiresFixStrength: Float
 
     // Stage 2 parameters
-    public let stage2Steps: Int32
-    public let stage2Guidance: Float
-    public let stage2Shift: Float
+    public var stage2Steps: Int32
+    public var stage2Guidance: Float
+    public var stage2Shift: Float
 
     // TEA Cache parameters
-    public let teaCache: Bool
-    public let teaCacheStart: Int32
-    public let teaCacheEnd: Int32
-    public let teaCacheThreshold: Float
-    public let teaCacheMaxSkipSteps: Int32
+    public var teaCache: Bool
+    public var teaCacheStart: Int32
+    public var teaCacheEnd: Int32
+    public var teaCacheThreshold: Float
+    public var teaCacheMaxSkipSteps: Int32
 
     // Causal inference parameters
-    public let causalInferenceEnabled: Bool
-    public let causalInference: Int32
-    public let causalInferencePad: Int32
+    public var causalInferenceEnabled: Bool
+    public var causalInference: Int32
+    public var causalInferencePad: Int32
 
     // Video parameters
-    public let fps: Int32
-    public let motionScale: Int32
-    public let guidingFrameNoise: Float
-    public let startFrameGuidance: Float
-    public let numFrames: Int32
+    public var fps: Int32
+    public var motionScale: Int32
+    public var guidingFrameNoise: Float
+    public var startFrameGuidance: Float
+    public var numFrames: Int32
 
     // Refiner parameters
-    public let refinerModel: String?
-    public let refinerStart: Float
-    public let zeroNegativePrompt: Bool
+    public var refinerModel: String?
+    public var refinerStart: Float
+    public var zeroNegativePrompt: Bool
 
     // Upscaler parameters
-    public let upscaler: String?
+    public var upscaler: String?
 
     // Face restoration
-    public let faceRestoration: String?
+    public var faceRestoration: String?
 
     // Configuration name
-    public let name: String?
+    public var name: String?
 
     // Separate text encoder prompts
-    public let clipLText: String?
-    public let openClipGText: String?
-    public let t5Text: String?
+    public var clipLText: String?
+    public var openClipGText: String?
+    public var t5Text: String?
 
     // Seed mode
-    public let seedMode: Int32
+    public var seedMode: Int32
 
     public init(
         width: Int32 = 512,
