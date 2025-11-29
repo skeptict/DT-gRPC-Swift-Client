@@ -2,6 +2,12 @@ import Foundation
 import SwiftUI
 import Combine
 
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
+
 @MainActor
 public class DrawThingsClient: ObservableObject {
     private let service: DrawThingsService
@@ -29,24 +35,24 @@ public class DrawThingsClient: ObservableObject {
         prompt: String,
         negativePrompt: String = "",
         configuration: DrawThingsConfiguration = DrawThingsConfiguration(),
-        image: NSImage? = nil,
-        mask: NSImage? = nil
-    ) async throws -> [NSImage] {
-        
+        image: PlatformImage? = nil,
+        mask: PlatformImage? = nil
+    ) async throws -> [PlatformImage] {
+
         currentProgress = ImageGenerationProgress()
-        
+
         let configData = try configuration.toFlatBufferData()
-        
+
         var imageData: Data?
         var maskData: Data?
 
         // Convert images to DTTensor format (required by Draw Things server)
         if let image = image {
-            imageData = try ImageHelpers.nsImageToDTTensor(image, forceRGB: true)
+            imageData = try ImageHelpers.imageToDTTensor(image, forceRGB: true)
         }
 
         if let mask = mask {
-            maskData = try ImageHelpers.nsImageToDTTensor(mask, forceRGB: true)
+            maskData = try ImageHelpers.imageToDTTensor(mask, forceRGB: true)
         }
 
         let resultData = try await service.generateImage(
@@ -64,8 +70,8 @@ public class DrawThingsClient: ObservableObject {
 
         currentProgress = nil
 
-        // Convert DTTensor results back to NSImage
-        return try resultData.map { try ImageHelpers.dtTensorToNSImage($0) }
+        // Convert DTTensor results back to PlatformImage
+        return try resultData.map { try ImageHelpers.dtTensorToImage($0) }
     }
     
     private func updateProgress(_ signpost: ImageGenerationSignpostProto?) {
