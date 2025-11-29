@@ -522,7 +522,7 @@ let images = try await client.generateImage(
 
 ### Video Generation
 
-DrawThingsKit supports video/animation generation with models that support temporal generation (e.g., Stable Video Diffusion, AnimateDiff, etc.). Video frames are generated on the server and returned sequentially as individual images.
+DrawThingsClient supports video/animation generation with models that support temporal generation (e.g., Stable Video Diffusion, AnimateDiff, etc.). Video frames are generated on the server and returned sequentially as individual images.
 
 #### Text-to-Video
 
