@@ -1,7 +1,7 @@
 import Foundation
 import FlatBuffers
 
-public struct LoRAConfig {
+public struct LoRAConfig: Sendable {
     public let file: String
     public let weight: Float
     public let mode: LoRAMode
@@ -13,7 +13,7 @@ public struct LoRAConfig {
     }
 }
 
-public struct ControlConfig {
+public struct ControlConfig: Sendable {
     public let file: String
     public let weight: Float
     public let guidanceStart: Float
@@ -29,7 +29,7 @@ public struct ControlConfig {
     }
 }
 
-public struct DrawThingsConfiguration {
+public struct DrawThingsConfiguration: Sendable {
     // Core parameters (width/height must be multiples of 64)
     public var width: Int32 = 512 {
         didSet { width = (width / 64) * 64 }
