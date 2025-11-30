@@ -37,14 +37,37 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
     /// Unknown model - will use default coefficients
     case unknown
 
-    /// Detect model family from model filename.
+    /// Detect model family from model filename or version string.
     ///
-    /// - Parameter modelName: The model filename (e.g., "flux1-dev-q8p.gguf")
+    /// - Parameter modelNameOrVersion: The model filename (e.g., "flux1-dev-q8p.gguf") or version string (e.g., "qwenImage", "flux1")
     /// - Returns: The detected model family
-    public static func detect(from modelName: String) -> LatentModelFamily {
-        let lowercased = modelName.lowercased()
+    public static func detect(from modelNameOrVersion: String) -> LatentModelFamily {
+        let lowercased = modelNameOrVersion.lowercased()
 
-        // Check for specific model families
+        // First check for exact version strings from Draw Things (case-insensitive)
+        // These come from CheckpointModel.version field
+        switch lowercased {
+        case "qwenimage":
+            return .qwen
+        case "flux1", "hidreami1":
+            return .flux
+        case "wan21_1_3b", "wan21_14b":
+            return .wan21
+        case "wan22_5b":
+            return .wan22
+        case "hunyuanvideo":
+            return .hunyuanVideo
+        case "sd3", "sd3large":
+            return .sd3
+        case "sdxlbase", "sdxlrefiner", "ssd1b":
+            return .sdxl
+        case "v1", "v2":
+            return .sd1
+        default:
+            break
+        }
+
+        // Fall back to substring matching for filenames
         if lowercased.contains("flux") || lowercased.contains("hidream") {
             return .flux
         }
@@ -71,7 +94,7 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
             return .sd1
         }
 
-        // Default to flux for unknown 16-channel models (most common case)
+        // Default to unknown for unrecognized models
         return .unknown
     }
 
@@ -422,6 +445,7 @@ public struct ImageHelpers {
         }
 
         guard channels == 3 || channels == 4 || channels == 16 || channels == 48 else {
+            DrawThingsClientLogger.error("dtTensorToImage: unsupported channel count \(channels)")
             throw ImageError.conversionFailed
         }
 
@@ -431,6 +455,8 @@ public struct ImageHelpers {
         guard tensorData.count >= expectedDataSize else {
             throw ImageError.invalidData
         }
+
+        DrawThingsClientLogger.debug("dtTensorToImage: \(width)x\(height), \(channels) channels, modelFamily=\(modelFamily?.rawValue ?? "nil")")
 
         // Output RGB data
         var rgbData = Data(count: width * height * 3)
@@ -444,24 +470,31 @@ public struct ImageHelpers {
 
                 if channels == 48 {
                     // 48-channel latent space to RGB (Wan 2.2 5B coefficients)
+                    DrawThingsClientLogger.debug("dtTensorToImage: using 48-channel Wan 2.2 conversion")
                     convert48ChannelToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
                 } else if channels == 16 {
                     // 16-channel latent space to RGB - use model-specific coefficients
                     let family = modelFamily ?? .flux
                     switch family {
                     case .qwen, .wan21:
+                        DrawThingsClientLogger.debug("dtTensorToImage: using Qwen/Wan21 16-channel conversion")
                         convertQwenWan21ToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
                     case .sd3:
+                        DrawThingsClientLogger.debug("dtTensorToImage: using SD3 16-channel conversion")
                         convertSD3ToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
                     case .hunyuanVideo:
+                        DrawThingsClientLogger.debug("dtTensorToImage: using HunyuanVideo 16-channel conversion")
                         convertHunyuanVideoToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
                     case .flux, .unknown:
+                        DrawThingsClientLogger.debug("dtTensorToImage: using Flux 16-channel conversion (family=\(family))")
                         convertFluxToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
                     default:
                         // Default to Flux coefficients for other 16-channel models
+                        DrawThingsClientLogger.debug("dtTensorToImage: using Flux 16-channel conversion (default for \(family))")
                         convertFluxToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
                     }
                 } else if channels == 4 {
+                    DrawThingsClientLogger.debug("dtTensorToImage: using 4-channel SDXL conversion")
                     // 4-channel latent space to RGB (SDXL coefficients)
                     for i in 0..<(width * height) {
                         let v0 = Float(Float16(bitPattern: float16Ptr[i * 4 + 0]))
