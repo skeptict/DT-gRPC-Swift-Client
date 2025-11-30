@@ -93,9 +93,9 @@ Preview images from Draw Things are 16-channel latent representations that need 
 
 ```swift
 // Detect from model filename or version string
-let family = LatentModelFamily.detect(from: "flux1-dev-q8p.gguf")     // .flux
-let family = LatentModelFamily.detect(from: "qwenImage")              // .qwen
-let family = LatentModelFamily.detect(from: "wan21_1_3b")             // .wan21
+let family = LatentModelFamily.detect(from: "flux1_dev_q8p.ckpt")     // .flux
+let family = LatentModelFamily.detect(from: "qwenImage")              // .qwen (version string)
+let family = LatentModelFamily.detect(from: "wan21_1_3b")             // .wan21 (version string)
 
 // Convert preview with correct colors
 let previewImage = try ImageHelpers.dtTensorToImage(previewData, modelFamily: family)
