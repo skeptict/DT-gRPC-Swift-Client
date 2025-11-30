@@ -79,9 +79,41 @@ let tensorData = try ImageHelpers.imageToDTTensor(image, forceRGB: true)
 
 // Convert DTTensor to PlatformImage (for receiving from Draw Things)
 let image = try ImageHelpers.dtTensorToImage(tensorData)
+
+// For preview images (16-channel latents), specify the model family for correct colors
+let family = LatentModelFamily.detect(from: "flux1-dev.gguf")
+let previewImage = try ImageHelpers.dtTensorToImage(previewData, modelFamily: family)
 ```
 
 **Note:** `PlatformImage` is a type alias that resolves to `NSImage` on macOS and `UIImage` on iOS.
+
+### Model Family Detection for Previews
+
+Preview images from Draw Things are 16-channel latent representations that need model-specific coefficients for correct color conversion. The `LatentModelFamily` enum handles this:
+
+```swift
+// Detect from model filename or version string
+let family = LatentModelFamily.detect(from: "flux1_dev_q8p.ckpt")     // .flux
+let family = LatentModelFamily.detect(from: "qwenImage")              // .qwen (version string)
+let family = LatentModelFamily.detect(from: "wan21_1_3b")             // .wan21 (version string)
+
+// Convert preview with correct colors
+let previewImage = try ImageHelpers.dtTensorToImage(previewData, modelFamily: family)
+```
+
+**Supported Model Families:**
+| Family | Models | Latent Channels |
+|--------|--------|-----------------|
+| `.sd1` | SD 1.x, SD 2.x | 4 |
+| `.sdxl` | SDXL Base, SDXL Refiner | 4 |
+| `.sd3` | Stable Diffusion 3 | 16 |
+| `.flux` | Flux.1, HiDream | 16 |
+| `.qwen` | Qwen Image, Qwen Image Edit | 16 |
+| `.wan21` | Wan 2.1 (1.3B, 14B) | 16 |
+| `.wan22` | Wan 2.2 5B | 48 |
+| `.hunyuanVideo` | HunyuanVideo | 16 |
+
+**Note:** If using **DrawThingsKit**, you don't need to handle this manually - the Kit automatically detects model families and converts previews/results to native `PlatformImage` types.
 
 ### When to Use Each Format
 
