@@ -228,7 +228,7 @@ public struct DrawThingsConfiguration: Sendable {
         teaCacheThreshold: Float = 0.06,
         teaCacheMaxSkipSteps: Int32 = 3,
         causalInferenceEnabled: Bool = false,
-        causalInference: Int32 = 0,
+        causalInference: Int32 = 3,
         causalInferencePad: Int32 = 0,
         fps: Int32 = 5,
         motionScale: Int32 = 127,

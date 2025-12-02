@@ -160,7 +160,7 @@ private func loadDrawThingsConfig(for key: String) async -> DrawThingsConfigurat
     let teaCacheMaxSkipSteps = Int32(json["teaCacheMaxSkipSteps"] as? Int ?? 3)
     
     // Causal inference parameters
-    let causalInference = Int32(json["causalInference"] as? Int ?? 0)
+    let causalInference = Int32(json["causalInference"] as? Int ?? 3)
     let causalInferencePad = Int32(json["causalInferencePad"] as? Int ?? 0)
     
     // Video parameters
