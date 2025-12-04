@@ -504,30 +504,10 @@ public struct ImageHelpers {
                 } else if channels == 4 {
                     DrawThingsClientLogger.debug("dtTensorToImage: using 4-channel SDXL conversion")
                     // 4-channel latent space to RGB (SDXL coefficients)
-                    for i in 0..<(width * height) {
-                        let v0 = Float(Float16(bitPattern: float16Ptr[i * 4 + 0]))
-                        let v1 = Float(Float16(bitPattern: float16Ptr[i * 4 + 1]))
-                        let v2 = Float(Float16(bitPattern: float16Ptr[i * 4 + 2]))
-                        let v3 = Float(Float16(bitPattern: float16Ptr[i * 4 + 3]))
-
-                        let r = 47.195 * v0 - 29.114 * v1 + 11.883 * v2 - 38.063 * v3 + 141.64
-                        let g = 53.237 * v0 - 1.4623 * v1 + 12.991 * v2 - 28.043 * v3 + 127.46
-                        let b = 58.182 * v0 + 4.3734 * v1 - 3.3735 * v2 - 26.722 * v3 + 114.5
-
-                        uint8Ptr[i * 3 + 0] = UInt8(clamping: Int(r))
-                        uint8Ptr[i * 3 + 1] = UInt8(clamping: Int(g))
-                        uint8Ptr[i * 3 + 2] = UInt8(clamping: Int(b))
-                    }
+                    convert4ChannelToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
                 } else {
                     // 3-channel RGB: Convert from [-1, 1] to [0, 255]
-                    let pixelCount = width * height * channels
-                    for i in 0..<pixelCount {
-                        let float16Bits = float16Ptr[i]
-                        let float16Value = Float16(bitPattern: float16Bits)
-                        let floatValue = Float(float16Value)
-                        let uint8Value = UInt8(clamping: Int(floatValue.isFinite ? (floatValue + 1.0) * 127.5 : 127.5))
-                        uint8Ptr[i] = uint8Value
-                    }
+                    convert3ChannelToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height * channels)
                 }
             }
         }
@@ -538,25 +518,62 @@ public struct ImageHelpers {
 
     // MARK: - Model-Specific Latent Conversion Functions
 
+    /// Helper to convert Float16 bit pattern to Float - helps compiler type-check in Release builds
+    @inline(__always)
+    private static func f16ToFloat(_ ptr: UnsafePointer<UInt16>, _ index: Int) -> Float {
+        let bits = ptr[index]
+        let f16 = Float16(bitPattern: bits)
+        return Float(f16)
+    }
+
+    /// Convert 4-channel SDXL latent to RGB
+    private static func convert4ChannelToRGB(float16Ptr: UnsafePointer<UInt16>, uint8Ptr: UnsafeMutablePointer<UInt8>, pixelCount: Int) {
+        for i in 0..<pixelCount {
+            let base = i * 4
+            let v0 = f16ToFloat(float16Ptr, base + 0)
+            let v1 = f16ToFloat(float16Ptr, base + 1)
+            let v2 = f16ToFloat(float16Ptr, base + 2)
+            let v3 = f16ToFloat(float16Ptr, base + 3)
+
+            let r: Float = 47.195 * v0 - 29.114 * v1 + 11.883 * v2 - 38.063 * v3 + 141.64
+            let g: Float = 53.237 * v0 - 1.4623 * v1 + 12.991 * v2 - 28.043 * v3 + 127.46
+            let b: Float = 58.182 * v0 + 4.3734 * v1 - 3.3735 * v2 - 26.722 * v3 + 114.5
+
+            uint8Ptr[i * 3 + 0] = UInt8(clamping: Int(r))
+            uint8Ptr[i * 3 + 1] = UInt8(clamping: Int(g))
+            uint8Ptr[i * 3 + 2] = UInt8(clamping: Int(b))
+        }
+    }
+
+    /// Convert 3-channel RGB from [-1, 1] to [0, 255]
+    private static func convert3ChannelToRGB(float16Ptr: UnsafePointer<UInt16>, uint8Ptr: UnsafeMutablePointer<UInt8>, pixelCount: Int) {
+        for i in 0..<pixelCount {
+            let floatValue = f16ToFloat(float16Ptr, i)
+            let uint8Value = UInt8(clamping: Int(floatValue.isFinite ? (floatValue + 1.0) * 127.5 : 127.5))
+            uint8Ptr[i] = uint8Value
+        }
+    }
+
     /// Convert 16-channel Flux latent to RGB
     private static func convertFluxToRGB(float16Ptr: UnsafePointer<UInt16>, uint8Ptr: UnsafeMutablePointer<UInt8>, pixelCount: Int) {
         for i in 0..<pixelCount {
-            let v0 = Float(Float16(bitPattern: float16Ptr[i * 16 + 0]))
-            let v1 = Float(Float16(bitPattern: float16Ptr[i * 16 + 1]))
-            let v2 = Float(Float16(bitPattern: float16Ptr[i * 16 + 2]))
-            let v3 = Float(Float16(bitPattern: float16Ptr[i * 16 + 3]))
-            let v4 = Float(Float16(bitPattern: float16Ptr[i * 16 + 4]))
-            let v5 = Float(Float16(bitPattern: float16Ptr[i * 16 + 5]))
-            let v6 = Float(Float16(bitPattern: float16Ptr[i * 16 + 6]))
-            let v7 = Float(Float16(bitPattern: float16Ptr[i * 16 + 7]))
-            let v8 = Float(Float16(bitPattern: float16Ptr[i * 16 + 8]))
-            let v9 = Float(Float16(bitPattern: float16Ptr[i * 16 + 9]))
-            let v10 = Float(Float16(bitPattern: float16Ptr[i * 16 + 10]))
-            let v11 = Float(Float16(bitPattern: float16Ptr[i * 16 + 11]))
-            let v12 = Float(Float16(bitPattern: float16Ptr[i * 16 + 12]))
-            let v13 = Float(Float16(bitPattern: float16Ptr[i * 16 + 13]))
-            let v14 = Float(Float16(bitPattern: float16Ptr[i * 16 + 14]))
-            let v15 = Float(Float16(bitPattern: float16Ptr[i * 16 + 15]))
+            let base = i * 16
+            let v0 = f16ToFloat(float16Ptr, base + 0)
+            let v1 = f16ToFloat(float16Ptr, base + 1)
+            let v2 = f16ToFloat(float16Ptr, base + 2)
+            let v3 = f16ToFloat(float16Ptr, base + 3)
+            let v4 = f16ToFloat(float16Ptr, base + 4)
+            let v5 = f16ToFloat(float16Ptr, base + 5)
+            let v6 = f16ToFloat(float16Ptr, base + 6)
+            let v7 = f16ToFloat(float16Ptr, base + 7)
+            let v8 = f16ToFloat(float16Ptr, base + 8)
+            let v9 = f16ToFloat(float16Ptr, base + 9)
+            let v10 = f16ToFloat(float16Ptr, base + 10)
+            let v11 = f16ToFloat(float16Ptr, base + 11)
+            let v12 = f16ToFloat(float16Ptr, base + 12)
+            let v13 = f16ToFloat(float16Ptr, base + 13)
+            let v14 = f16ToFloat(float16Ptr, base + 14)
+            let v15 = f16ToFloat(float16Ptr, base + 15)
 
             var rVal: Float = -0.0346 * v0 + 0.0034 * v1 + 0.0275 * v2 - 0.0174 * v3
             rVal += 0.0859 * v4 + 0.0004 * v5 + 0.0405 * v6 - 0.0236 * v7
@@ -585,22 +602,23 @@ public struct ImageHelpers {
     /// Convert 16-channel SD3 latent to RGB
     private static func convertSD3ToRGB(float16Ptr: UnsafePointer<UInt16>, uint8Ptr: UnsafeMutablePointer<UInt8>, pixelCount: Int) {
         for i in 0..<pixelCount {
-            let v0 = Float(Float16(bitPattern: float16Ptr[i * 16 + 0]))
-            let v1 = Float(Float16(bitPattern: float16Ptr[i * 16 + 1]))
-            let v2 = Float(Float16(bitPattern: float16Ptr[i * 16 + 2]))
-            let v3 = Float(Float16(bitPattern: float16Ptr[i * 16 + 3]))
-            let v4 = Float(Float16(bitPattern: float16Ptr[i * 16 + 4]))
-            let v5 = Float(Float16(bitPattern: float16Ptr[i * 16 + 5]))
-            let v6 = Float(Float16(bitPattern: float16Ptr[i * 16 + 6]))
-            let v7 = Float(Float16(bitPattern: float16Ptr[i * 16 + 7]))
-            let v8 = Float(Float16(bitPattern: float16Ptr[i * 16 + 8]))
-            let v9 = Float(Float16(bitPattern: float16Ptr[i * 16 + 9]))
-            let v10 = Float(Float16(bitPattern: float16Ptr[i * 16 + 10]))
-            let v11 = Float(Float16(bitPattern: float16Ptr[i * 16 + 11]))
-            let v12 = Float(Float16(bitPattern: float16Ptr[i * 16 + 12]))
-            let v13 = Float(Float16(bitPattern: float16Ptr[i * 16 + 13]))
-            let v14 = Float(Float16(bitPattern: float16Ptr[i * 16 + 14]))
-            let v15 = Float(Float16(bitPattern: float16Ptr[i * 16 + 15]))
+            let base = i * 16
+            let v0 = f16ToFloat(float16Ptr, base + 0)
+            let v1 = f16ToFloat(float16Ptr, base + 1)
+            let v2 = f16ToFloat(float16Ptr, base + 2)
+            let v3 = f16ToFloat(float16Ptr, base + 3)
+            let v4 = f16ToFloat(float16Ptr, base + 4)
+            let v5 = f16ToFloat(float16Ptr, base + 5)
+            let v6 = f16ToFloat(float16Ptr, base + 6)
+            let v7 = f16ToFloat(float16Ptr, base + 7)
+            let v8 = f16ToFloat(float16Ptr, base + 8)
+            let v9 = f16ToFloat(float16Ptr, base + 9)
+            let v10 = f16ToFloat(float16Ptr, base + 10)
+            let v11 = f16ToFloat(float16Ptr, base + 11)
+            let v12 = f16ToFloat(float16Ptr, base + 12)
+            let v13 = f16ToFloat(float16Ptr, base + 13)
+            let v14 = f16ToFloat(float16Ptr, base + 14)
+            let v15 = f16ToFloat(float16Ptr, base + 15)
 
             var rVal: Float = -0.0922 * v0 + 0.0311 * v1 + 0.1994 * v2 + 0.0856 * v3
             rVal += 0.0587 * v4 - 0.0006 * v5 + 0.0978 * v6 - 0.0042 * v7
@@ -629,22 +647,23 @@ public struct ImageHelpers {
     /// Convert 16-channel HunyuanVideo latent to RGB
     private static func convertHunyuanVideoToRGB(float16Ptr: UnsafePointer<UInt16>, uint8Ptr: UnsafeMutablePointer<UInt8>, pixelCount: Int) {
         for i in 0..<pixelCount {
-            let v0 = Float(Float16(bitPattern: float16Ptr[i * 16 + 0]))
-            let v1 = Float(Float16(bitPattern: float16Ptr[i * 16 + 1]))
-            let v2 = Float(Float16(bitPattern: float16Ptr[i * 16 + 2]))
-            let v3 = Float(Float16(bitPattern: float16Ptr[i * 16 + 3]))
-            let v4 = Float(Float16(bitPattern: float16Ptr[i * 16 + 4]))
-            let v5 = Float(Float16(bitPattern: float16Ptr[i * 16 + 5]))
-            let v6 = Float(Float16(bitPattern: float16Ptr[i * 16 + 6]))
-            let v7 = Float(Float16(bitPattern: float16Ptr[i * 16 + 7]))
-            let v8 = Float(Float16(bitPattern: float16Ptr[i * 16 + 8]))
-            let v9 = Float(Float16(bitPattern: float16Ptr[i * 16 + 9]))
-            let v10 = Float(Float16(bitPattern: float16Ptr[i * 16 + 10]))
-            let v11 = Float(Float16(bitPattern: float16Ptr[i * 16 + 11]))
-            let v12 = Float(Float16(bitPattern: float16Ptr[i * 16 + 12]))
-            let v13 = Float(Float16(bitPattern: float16Ptr[i * 16 + 13]))
-            let v14 = Float(Float16(bitPattern: float16Ptr[i * 16 + 14]))
-            let v15 = Float(Float16(bitPattern: float16Ptr[i * 16 + 15]))
+            let base = i * 16
+            let v0 = f16ToFloat(float16Ptr, base + 0)
+            let v1 = f16ToFloat(float16Ptr, base + 1)
+            let v2 = f16ToFloat(float16Ptr, base + 2)
+            let v3 = f16ToFloat(float16Ptr, base + 3)
+            let v4 = f16ToFloat(float16Ptr, base + 4)
+            let v5 = f16ToFloat(float16Ptr, base + 5)
+            let v6 = f16ToFloat(float16Ptr, base + 6)
+            let v7 = f16ToFloat(float16Ptr, base + 7)
+            let v8 = f16ToFloat(float16Ptr, base + 8)
+            let v9 = f16ToFloat(float16Ptr, base + 9)
+            let v10 = f16ToFloat(float16Ptr, base + 10)
+            let v11 = f16ToFloat(float16Ptr, base + 11)
+            let v12 = f16ToFloat(float16Ptr, base + 12)
+            let v13 = f16ToFloat(float16Ptr, base + 13)
+            let v14 = f16ToFloat(float16Ptr, base + 14)
+            let v15 = f16ToFloat(float16Ptr, base + 15)
 
             var rVal: Float = -0.0395 * v0 + 0.0696 * v1 + 0.0135 * v2 + 0.0108 * v3
             rVal += -0.0209 * v4 - 0.0804 * v5 - 0.0991 * v6 - 0.0646 * v7
@@ -673,22 +692,23 @@ public struct ImageHelpers {
     /// Convert 16-channel Qwen/Wan 2.1 latent to RGB
     private static func convertQwenWan21ToRGB(float16Ptr: UnsafePointer<UInt16>, uint8Ptr: UnsafeMutablePointer<UInt8>, pixelCount: Int) {
         for i in 0..<pixelCount {
-            let v0 = Float(Float16(bitPattern: float16Ptr[i * 16 + 0]))
-            let v1 = Float(Float16(bitPattern: float16Ptr[i * 16 + 1]))
-            let v2 = Float(Float16(bitPattern: float16Ptr[i * 16 + 2]))
-            let v3 = Float(Float16(bitPattern: float16Ptr[i * 16 + 3]))
-            let v4 = Float(Float16(bitPattern: float16Ptr[i * 16 + 4]))
-            let v5 = Float(Float16(bitPattern: float16Ptr[i * 16 + 5]))
-            let v6 = Float(Float16(bitPattern: float16Ptr[i * 16 + 6]))
-            let v7 = Float(Float16(bitPattern: float16Ptr[i * 16 + 7]))
-            let v8 = Float(Float16(bitPattern: float16Ptr[i * 16 + 8]))
-            let v9 = Float(Float16(bitPattern: float16Ptr[i * 16 + 9]))
-            let v10 = Float(Float16(bitPattern: float16Ptr[i * 16 + 10]))
-            let v11 = Float(Float16(bitPattern: float16Ptr[i * 16 + 11]))
-            let v12 = Float(Float16(bitPattern: float16Ptr[i * 16 + 12]))
-            let v13 = Float(Float16(bitPattern: float16Ptr[i * 16 + 13]))
-            let v14 = Float(Float16(bitPattern: float16Ptr[i * 16 + 14]))
-            let v15 = Float(Float16(bitPattern: float16Ptr[i * 16 + 15]))
+            let base = i * 16
+            let v0 = f16ToFloat(float16Ptr, base + 0)
+            let v1 = f16ToFloat(float16Ptr, base + 1)
+            let v2 = f16ToFloat(float16Ptr, base + 2)
+            let v3 = f16ToFloat(float16Ptr, base + 3)
+            let v4 = f16ToFloat(float16Ptr, base + 4)
+            let v5 = f16ToFloat(float16Ptr, base + 5)
+            let v6 = f16ToFloat(float16Ptr, base + 6)
+            let v7 = f16ToFloat(float16Ptr, base + 7)
+            let v8 = f16ToFloat(float16Ptr, base + 8)
+            let v9 = f16ToFloat(float16Ptr, base + 9)
+            let v10 = f16ToFloat(float16Ptr, base + 10)
+            let v11 = f16ToFloat(float16Ptr, base + 11)
+            let v12 = f16ToFloat(float16Ptr, base + 12)
+            let v13 = f16ToFloat(float16Ptr, base + 13)
+            let v14 = f16ToFloat(float16Ptr, base + 14)
+            let v15 = f16ToFloat(float16Ptr, base + 15)
 
             var rVal: Float = -0.1299 * v0 + 0.0671 * v1 + 0.3568 * v2 + 0.0372 * v3
             rVal += 0.0313 * v4 + 0.0296 * v5 - 0.3477 * v6 + 0.0166 * v7
@@ -718,54 +738,55 @@ public struct ImageHelpers {
     private static func convert48ChannelToRGB(float16Ptr: UnsafePointer<UInt16>, uint8Ptr: UnsafeMutablePointer<UInt8>, pixelCount: Int) {
         for i in 0..<pixelCount {
             // Read all 48 channels
-            let v0 = Float(Float16(bitPattern: float16Ptr[i * 48 + 0]))
-            let v1 = Float(Float16(bitPattern: float16Ptr[i * 48 + 1]))
-            let v2 = Float(Float16(bitPattern: float16Ptr[i * 48 + 2]))
-            let v3 = Float(Float16(bitPattern: float16Ptr[i * 48 + 3]))
-            let v4 = Float(Float16(bitPattern: float16Ptr[i * 48 + 4]))
-            let v5 = Float(Float16(bitPattern: float16Ptr[i * 48 + 5]))
-            let v6 = Float(Float16(bitPattern: float16Ptr[i * 48 + 6]))
-            let v7 = Float(Float16(bitPattern: float16Ptr[i * 48 + 7]))
-            let v8 = Float(Float16(bitPattern: float16Ptr[i * 48 + 8]))
-            let v9 = Float(Float16(bitPattern: float16Ptr[i * 48 + 9]))
-            let v10 = Float(Float16(bitPattern: float16Ptr[i * 48 + 10]))
-            let v11 = Float(Float16(bitPattern: float16Ptr[i * 48 + 11]))
-            let v12 = Float(Float16(bitPattern: float16Ptr[i * 48 + 12]))
-            let v13 = Float(Float16(bitPattern: float16Ptr[i * 48 + 13]))
-            let v14 = Float(Float16(bitPattern: float16Ptr[i * 48 + 14]))
-            let v15 = Float(Float16(bitPattern: float16Ptr[i * 48 + 15]))
-            let v16 = Float(Float16(bitPattern: float16Ptr[i * 48 + 16]))
-            let v17 = Float(Float16(bitPattern: float16Ptr[i * 48 + 17]))
-            let v18 = Float(Float16(bitPattern: float16Ptr[i * 48 + 18]))
-            let v19 = Float(Float16(bitPattern: float16Ptr[i * 48 + 19]))
-            let v20 = Float(Float16(bitPattern: float16Ptr[i * 48 + 20]))
-            let v21 = Float(Float16(bitPattern: float16Ptr[i * 48 + 21]))
-            let v22 = Float(Float16(bitPattern: float16Ptr[i * 48 + 22]))
-            let v23 = Float(Float16(bitPattern: float16Ptr[i * 48 + 23]))
-            let v24 = Float(Float16(bitPattern: float16Ptr[i * 48 + 24]))
-            let v25 = Float(Float16(bitPattern: float16Ptr[i * 48 + 25]))
-            let v26 = Float(Float16(bitPattern: float16Ptr[i * 48 + 26]))
-            let v27 = Float(Float16(bitPattern: float16Ptr[i * 48 + 27]))
-            let v28 = Float(Float16(bitPattern: float16Ptr[i * 48 + 28]))
-            let v29 = Float(Float16(bitPattern: float16Ptr[i * 48 + 29]))
-            let v30 = Float(Float16(bitPattern: float16Ptr[i * 48 + 30]))
-            let v31 = Float(Float16(bitPattern: float16Ptr[i * 48 + 31]))
-            let v32 = Float(Float16(bitPattern: float16Ptr[i * 48 + 32]))
-            let v33 = Float(Float16(bitPattern: float16Ptr[i * 48 + 33]))
-            let v34 = Float(Float16(bitPattern: float16Ptr[i * 48 + 34]))
-            let v35 = Float(Float16(bitPattern: float16Ptr[i * 48 + 35]))
-            let v36 = Float(Float16(bitPattern: float16Ptr[i * 48 + 36]))
-            let v37 = Float(Float16(bitPattern: float16Ptr[i * 48 + 37]))
-            let v38 = Float(Float16(bitPattern: float16Ptr[i * 48 + 38]))
-            let v39 = Float(Float16(bitPattern: float16Ptr[i * 48 + 39]))
-            let v40 = Float(Float16(bitPattern: float16Ptr[i * 48 + 40]))
-            let v41 = Float(Float16(bitPattern: float16Ptr[i * 48 + 41]))
-            let v42 = Float(Float16(bitPattern: float16Ptr[i * 48 + 42]))
-            let v43 = Float(Float16(bitPattern: float16Ptr[i * 48 + 43]))
-            let v44 = Float(Float16(bitPattern: float16Ptr[i * 48 + 44]))
-            let v45 = Float(Float16(bitPattern: float16Ptr[i * 48 + 45]))
-            let v46 = Float(Float16(bitPattern: float16Ptr[i * 48 + 46]))
-            let v47 = Float(Float16(bitPattern: float16Ptr[i * 48 + 47]))
+            let base = i * 48
+            let v0 = f16ToFloat(float16Ptr, base + 0)
+            let v1 = f16ToFloat(float16Ptr, base + 1)
+            let v2 = f16ToFloat(float16Ptr, base + 2)
+            let v3 = f16ToFloat(float16Ptr, base + 3)
+            let v4 = f16ToFloat(float16Ptr, base + 4)
+            let v5 = f16ToFloat(float16Ptr, base + 5)
+            let v6 = f16ToFloat(float16Ptr, base + 6)
+            let v7 = f16ToFloat(float16Ptr, base + 7)
+            let v8 = f16ToFloat(float16Ptr, base + 8)
+            let v9 = f16ToFloat(float16Ptr, base + 9)
+            let v10 = f16ToFloat(float16Ptr, base + 10)
+            let v11 = f16ToFloat(float16Ptr, base + 11)
+            let v12 = f16ToFloat(float16Ptr, base + 12)
+            let v13 = f16ToFloat(float16Ptr, base + 13)
+            let v14 = f16ToFloat(float16Ptr, base + 14)
+            let v15 = f16ToFloat(float16Ptr, base + 15)
+            let v16 = f16ToFloat(float16Ptr, base + 16)
+            let v17 = f16ToFloat(float16Ptr, base + 17)
+            let v18 = f16ToFloat(float16Ptr, base + 18)
+            let v19 = f16ToFloat(float16Ptr, base + 19)
+            let v20 = f16ToFloat(float16Ptr, base + 20)
+            let v21 = f16ToFloat(float16Ptr, base + 21)
+            let v22 = f16ToFloat(float16Ptr, base + 22)
+            let v23 = f16ToFloat(float16Ptr, base + 23)
+            let v24 = f16ToFloat(float16Ptr, base + 24)
+            let v25 = f16ToFloat(float16Ptr, base + 25)
+            let v26 = f16ToFloat(float16Ptr, base + 26)
+            let v27 = f16ToFloat(float16Ptr, base + 27)
+            let v28 = f16ToFloat(float16Ptr, base + 28)
+            let v29 = f16ToFloat(float16Ptr, base + 29)
+            let v30 = f16ToFloat(float16Ptr, base + 30)
+            let v31 = f16ToFloat(float16Ptr, base + 31)
+            let v32 = f16ToFloat(float16Ptr, base + 32)
+            let v33 = f16ToFloat(float16Ptr, base + 33)
+            let v34 = f16ToFloat(float16Ptr, base + 34)
+            let v35 = f16ToFloat(float16Ptr, base + 35)
+            let v36 = f16ToFloat(float16Ptr, base + 36)
+            let v37 = f16ToFloat(float16Ptr, base + 37)
+            let v38 = f16ToFloat(float16Ptr, base + 38)
+            let v39 = f16ToFloat(float16Ptr, base + 39)
+            let v40 = f16ToFloat(float16Ptr, base + 40)
+            let v41 = f16ToFloat(float16Ptr, base + 41)
+            let v42 = f16ToFloat(float16Ptr, base + 42)
+            let v43 = f16ToFloat(float16Ptr, base + 43)
+            let v44 = f16ToFloat(float16Ptr, base + 44)
+            let v45 = f16ToFloat(float16Ptr, base + 45)
+            let v46 = f16ToFloat(float16Ptr, base + 46)
+            let v47 = f16ToFloat(float16Ptr, base + 47)
 
             // Wan 2.2 5B coefficients
             var rVal: Float = 0.0119 * v0 - 0.1062 * v1 + 0.0140 * v2 - 0.0813 * v3
