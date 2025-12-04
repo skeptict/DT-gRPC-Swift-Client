@@ -406,11 +406,10 @@ public struct ImageHelpers {
 
                     for c in 0..<channels {
                         let uint8Value = pixelData[rgbaIndex + c]
-                        let floatValue = (Float(uint8Value) / 255.0 * 2.0) - 1.0
-                        let float16Value = Float16(floatValue)
+                        let floatValue: Float = (Float(uint8Value) / 255.0 * 2.0) - 1.0
+                        let bitPattern: UInt16 = floatToFloat16Bits(floatValue)
 
                         let byteOffset = (y * width + x) * channels * 2 + c * 2
-                        let bitPattern = float16Value.bitPattern
                         tensorPixelPtr.storeBytes(of: UInt8(bitPattern & 0xFF), toByteOffset: byteOffset, as: UInt8.self)
                         tensorPixelPtr.storeBytes(of: UInt8((bitPattern >> 8) & 0xFF), toByteOffset: byteOffset + 1, as: UInt8.self)
                     }
@@ -518,12 +517,79 @@ public struct ImageHelpers {
 
     // MARK: - Model-Specific Latent Conversion Functions
 
-    /// Helper to convert Float16 bit pattern to Float - helps compiler type-check in Release builds
+    /// Helper to convert Float16 bit pattern to Float - works on all platforms
     @inline(__always)
     private static func f16ToFloat(_ ptr: UnsafePointer<UInt16>, _ index: Int) -> Float {
-        let bits = ptr[index]
-        let f16 = Float16(bitPattern: bits)
-        return Float(f16)
+        let bits: UInt16 = ptr[index]
+        return float16BitsToFloat(bits)
+    }
+
+    /// Convert Float16 bit pattern to Float32 manually (platform-independent)
+    @inline(__always)
+    private static func float16BitsToFloat(_ h: UInt16) -> Float {
+        let sign = UInt32((h >> 15) & 0x1)
+        let exponent = UInt32((h >> 10) & 0x1F)
+        let mantissa = UInt32(h & 0x3FF)
+
+        var result: UInt32
+
+        if exponent == 0 {
+            if mantissa == 0 {
+                // Zero
+                result = sign << 31
+            } else {
+                // Denormalized number - convert to normalized
+                var exp = Int32(-14)
+                var mant = mantissa
+                while (mant & 0x400) == 0 {
+                    mant <<= 1
+                    exp -= 1
+                }
+                mant &= 0x3FF
+                result = (sign << 31) | (UInt32(Int32(127) + exp) << 23) | (mant << 13)
+            }
+        } else if exponent == 31 {
+            // Infinity or NaN
+            result = (sign << 31) | 0x7F800000 | (mantissa << 13)
+        } else {
+            // Normalized number
+            result = (sign << 31) | ((exponent + 112) << 23) | (mantissa << 13)
+        }
+
+        return Float(bitPattern: result)
+    }
+
+    /// Convert Float32 to Float16 bit pattern manually (platform-independent)
+    @inline(__always)
+    private static func floatToFloat16Bits(_ f: Float) -> UInt16 {
+        let bits = f.bitPattern
+        let sign = UInt16((bits >> 31) & 0x1)
+        let exponent = Int32((bits >> 23) & 0xFF)
+        let mantissa = bits & 0x7FFFFF
+
+        var result: UInt16
+
+        if exponent == 0 {
+            // Zero or denormalized (becomes zero in float16)
+            result = sign << 15
+        } else if exponent == 255 {
+            // Infinity or NaN
+            result = (sign << 15) | 0x7C00 | UInt16((mantissa >> 13) & 0x3FF)
+        } else {
+            // Normalized number
+            let newExp = exponent - 127 + 15
+            if newExp <= 0 {
+                // Underflow to zero
+                result = sign << 15
+            } else if newExp >= 31 {
+                // Overflow to infinity
+                result = (sign << 15) | 0x7C00
+            } else {
+                result = (sign << 15) | (UInt16(newExp) << 10) | UInt16((mantissa >> 13) & 0x3FF)
+            }
+        }
+
+        return result
     }
 
     /// Convert 4-channel SDXL latent to RGB
