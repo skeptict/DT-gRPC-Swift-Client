@@ -30,6 +30,8 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
     case hunyuanVideo
     /// Qwen Image Edit (16-channel latent, same coefficients as Wan 2.1)
     case qwen
+    /// Z Image (16-channel latent, uses Flux-like coefficients)
+    case zImage
     /// Wan 2.1 models (16-channel latent)
     case wan21
     /// Wan 2.2 5B model (48-channel latent)
@@ -49,6 +51,8 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
         switch lowercased {
         case "qwenimage":
             return .qwen
+        case "zimage":
+            return .zImage
         case "flux1", "hidreami1":
             return .flux
         case "wan21_1_3b", "wan21_14b":
@@ -70,6 +74,9 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
         // Fall back to substring matching for filenames
         if lowercased.contains("flux") || lowercased.contains("hidream") {
             return .flux
+        }
+        if lowercased.contains("zimage") || lowercased.contains("z_image") || lowercased.contains("z-image") {
+            return .zImage
         }
         if lowercased.contains("qwen") {
             return .qwen
@@ -103,7 +110,7 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
         switch self {
         case .sd1, .sdxl:
             return 4
-        case .sd3, .flux, .hunyuanVideo, .qwen, .wan21:
+        case .sd3, .flux, .hunyuanVideo, .qwen, .zImage, .wan21:
             return 16
         case .wan22:
             return 48
@@ -485,7 +492,8 @@ public struct ImageHelpers {
                     case .hunyuanVideo:
                         DrawThingsClientLogger.debug("dtTensorToImage: using HunyuanVideo 16-channel conversion")
                         convertHunyuanVideoToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
-                    case .flux, .unknown:
+                    case .flux, .zImage, .unknown:
+                        // Z Image uses Flux-like latent space
                         DrawThingsClientLogger.debug("dtTensorToImage: using Flux 16-channel conversion (family=\(family))")
                         convertFluxToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
                     default:
