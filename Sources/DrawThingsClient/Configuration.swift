@@ -357,9 +357,10 @@ public struct DrawThingsConfiguration: Sendable {
         configT.clipSkip = UInt32(clipSkip)
         configT.shift = shift
 
-        // Seed handling
+        // Seed handling - clamp to UInt32 range for flatbuffer compatibility
         if let seed = seed, seed >= 0 {
-            configT.seed = UInt32(seed)
+            // Mask to UInt32 range to handle seeds that exceed UInt32.max
+            configT.seed = UInt32(truncatingIfNeeded: seed)
         } else {
             configT.seed = arc4random()
         }
