@@ -41,7 +41,7 @@ public class DrawThingsClient: ObservableObject {
             lastError = error
         }
     }
-    
+
     public func generateImage(
         prompt: String,
         negativePrompt: String = "",
@@ -81,8 +81,11 @@ public class DrawThingsClient: ObservableObject {
 
         currentProgress = nil
 
+        // Detect model family for correct latent-to-RGB conversion
+        let modelFamily = LatentModelFamily.detect(from: configuration.model)
+
         // Convert DTTensor results back to PlatformImage
-        return try resultData.map { try ImageHelpers.dtTensorToImage($0) }
+        return try resultData.map { try ImageHelpers.dtTensorToImage($0, modelFamily: modelFamily) }
     }
     
     private func updateProgress(_ signpost: ImageGenerationSignpostProto?) {
