@@ -453,6 +453,7 @@ public struct ImageHelpers {
         }
 
         let compressionFlag = header[0]
+        let formatFlag = header[2]  // 0x01 = NCHW (planar), 0x02 = NHWC (interleaved)
         let height = Int(header[6])
         let width = Int(header[7])
         let channels = Int(header[8])
@@ -473,6 +474,8 @@ public struct ImageHelpers {
             throw ImageError.invalidData
         }
 
+        let isNCHW = formatFlag != 0x02  // Anything other than NHWC is treated as NCHW
+        NSLog("[dtTensor] %dx%d, %d channels, format=0x%x (%@), modelFamily=%@, tensorSize=%d bytes", width, height, channels, formatFlag, isNCHW ? "NCHW" : "NHWC", modelFamily?.rawValue ?? "nil", tensorData.count)
         DrawThingsClientLogger.debug("dtTensorToImage: \(width)x\(height), \(channels) channels, modelFamily=\(modelFamily?.rawValue ?? "nil")")
 
         // Output RGB data
@@ -516,8 +519,87 @@ public struct ImageHelpers {
                     // 4-channel latent space to RGB (SDXL coefficients)
                     convert4ChannelToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
                 } else {
-                    // 3-channel RGB: Convert from [-1, 1] to [0, 255]
-                    convert3ChannelToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height * channels)
+                    // 3-channel decoded RGB — auto-detect layout and value range
+                    let totalValues = width * height * channels
+                    let planeSize = width * height
+
+                    // 1) Sample values to determine range
+                    let sampleCount = min(2000, totalValues)
+                    let sampleStep = max(1, totalValues / sampleCount)
+                    var negCount = 0
+                    var minVal: Float = .infinity
+                    var maxVal: Float = -.infinity
+                    for idx in stride(from: 0, to: totalValues, by: sampleStep) {
+                        let v = f16ToFloat(float16Ptr, idx)
+                        guard v.isFinite else { continue }
+                        if v < -0.01 { negCount += 1 }
+                        minVal = min(minVal, v)
+                        maxVal = max(maxVal, v)
+                    }
+                    let sampledCount = (totalValues + sampleStep - 1) / sampleStep
+                    let hasNegatives = negCount > sampledCount / 10  // >10% negative → [-1,1]
+
+                    // 2) Auto-detect NCHW vs NHWC via spatial autocorrelation
+                    //    NCHW: adjacent indices = adjacent pixels in same channel (high correlation)
+                    //    NHWC: stride-3 indices = adjacent pixels in same channel
+                    let checkPixels = min(200, width - 1)
+                    var nchwDiff: Float = 0  // adjacent indices diff (NCHW hypothesis)
+                    var nhwcDiff: Float = 0  // stride-3 diff (NHWC hypothesis)
+                    for i in 0..<checkPixels {
+                        nchwDiff += abs(f16ToFloat(float16Ptr, i) - f16ToFloat(float16Ptr, i + 1))
+                        let a = i * 3, b = (i + 1) * 3
+                        if b < totalValues {
+                            nhwcDiff += abs(f16ToFloat(float16Ptr, a) - f16ToFloat(float16Ptr, b))
+                        }
+                    }
+                    let autoNCHW = nchwDiff < nhwcDiff
+
+                    // Trust the header format flag — the server explicitly sets it
+                    let useNCHW = isNCHW
+
+                    NSLog("[dtTensor] 3ch detect: neg=%d/%d min=%.4f max=%.4f hasNeg=%d nchwD=%.2f nhwcD=%.2f autoNCHW=%d headerNCHW=%d → useNCHW=%d",
+                          negCount, sampledCount, minVal, maxVal, hasNegatives ? 1 : 0,
+                          nchwDiff, nhwcDiff, autoNCHW ? 1 : 0, isNCHW ? 1 : 0, useNCHW ? 1 : 0)
+
+                    // Write header dump to file for diagnostics
+                    var diag = "[dtTensor] Diagnostic at \(Date())\n"
+                    diag += "Header (17 x UInt32):\n"
+                    for hi in 0..<17 { diag += "  [\(hi)] = \(header[hi])  (0x\(String(header[hi], radix: 16)))\n" }
+                    diag += "Dims: \(width)x\(height)x\(channels)\n"
+                    diag += "Sample: neg=\(negCount)/\(sampledCount), min=\(minVal), max=\(maxVal), hasNeg=\(hasNegatives)\n"
+                    diag += "Correlation: nchwDiff=\(nchwDiff), nhwcDiff=\(nhwcDiff), autoNCHW=\(autoNCHW)\n"
+                    diag += "Decision: useNCHW=\(useNCHW)\n"
+                    diag += "First 20 float16 values:\n"
+                    for vi in 0..<min(20, totalValues) { diag += "  [\(vi)] = \(f16ToFloat(float16Ptr, vi))\n" }
+                    try? diag.write(toFile: "/tmp/dts_tensor_diag.log", atomically: true, encoding: .utf8)
+
+                    if useNCHW {
+                        // NCHW planar: [RRR...][GGG...][BBB...]
+                        for i in 0..<planeSize {
+                            let r = f16ToFloat(float16Ptr, i)
+                            let g = f16ToFloat(float16Ptr, i + planeSize)
+                            let b = f16ToFloat(float16Ptr, i + planeSize * 2)
+                            if hasNegatives {
+                                uint8Ptr[i * 3 + 0] = UInt8(clamping: Int((r + 1.0) * 127.5))
+                                uint8Ptr[i * 3 + 1] = UInt8(clamping: Int((g + 1.0) * 127.5))
+                                uint8Ptr[i * 3 + 2] = UInt8(clamping: Int((b + 1.0) * 127.5))
+                            } else {
+                                uint8Ptr[i * 3 + 0] = UInt8(clamping: Int(min(max(r, 0), 1) * 255))
+                                uint8Ptr[i * 3 + 1] = UInt8(clamping: Int(min(max(g, 0), 1) * 255))
+                                uint8Ptr[i * 3 + 2] = UInt8(clamping: Int(min(max(b, 0), 1) * 255))
+                            }
+                        }
+                    } else {
+                        // NHWC interleaved: [RGB][RGB]...
+                        if hasNegatives {
+                            convert3ChannelToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: totalValues)
+                        } else {
+                            for i in 0..<totalValues {
+                                let v = f16ToFloat(float16Ptr, i)
+                                uint8Ptr[i] = UInt8(clamping: Int(v.isFinite ? min(max(v, 0), 1) * 255 : 0))
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -616,13 +698,13 @@ public struct ImageHelpers {
             let g: Float = 53.237 * v0 - 1.4623 * v1 + 12.991 * v2 - 28.043 * v3 + 127.46
             let b: Float = 58.182 * v0 + 4.3734 * v1 - 3.3735 * v2 - 26.722 * v3 + 114.5
 
-            uint8Ptr[i * 3 + 0] = UInt8(clamping: Int(r))
-            uint8Ptr[i * 3 + 1] = UInt8(clamping: Int(g))
-            uint8Ptr[i * 3 + 2] = UInt8(clamping: Int(b))
+            uint8Ptr[i * 3 + 0] = UInt8(clamping: Int(r.isFinite ? r : 0))
+            uint8Ptr[i * 3 + 1] = UInt8(clamping: Int(g.isFinite ? g : 0))
+            uint8Ptr[i * 3 + 2] = UInt8(clamping: Int(b.isFinite ? b : 0))
         }
     }
 
-    /// Convert 3-channel RGB from [-1, 1] to [0, 255]
+    /// Convert 3-channel NHWC interleaved RGB from [-1, 1] to [0, 255]
     private static func convert3ChannelToRGB(float16Ptr: UnsafePointer<UInt16>, uint8Ptr: UnsafeMutablePointer<UInt8>, pixelCount: Int) {
         for i in 0..<pixelCount {
             let floatValue = f16ToFloat(float16Ptr, i)

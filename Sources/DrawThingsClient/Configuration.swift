@@ -532,10 +532,6 @@ public struct DrawThingsConfiguration: Sendable {
 
     // Map seed mode to FlatBuffer enum
     private func mapSeedModeToEnum(_ mode: Int32) -> SeedMode {
-        switch mode {
-        case 0: return .legacy
-        case 1, 2: return .torchcpucompatible
-        default: return .torchcpucompatible
-        }
+        return SeedMode(rawValue: Int8(mode)) ?? .scalealike
     }
 }
