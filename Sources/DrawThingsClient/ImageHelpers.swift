@@ -561,18 +561,6 @@ public struct ImageHelpers {
                           negCount, sampledCount, minVal, maxVal, hasNegatives ? 1 : 0,
                           nchwDiff, nhwcDiff, autoNCHW ? 1 : 0, isNCHW ? 1 : 0, useNCHW ? 1 : 0)
 
-                    // Write header dump to file for diagnostics
-                    var diag = "[dtTensor] Diagnostic at \(Date())\n"
-                    diag += "Header (17 x UInt32):\n"
-                    for hi in 0..<17 { diag += "  [\(hi)] = \(header[hi])  (0x\(String(header[hi], radix: 16)))\n" }
-                    diag += "Dims: \(width)x\(height)x\(channels)\n"
-                    diag += "Sample: neg=\(negCount)/\(sampledCount), min=\(minVal), max=\(maxVal), hasNeg=\(hasNegatives)\n"
-                    diag += "Correlation: nchwDiff=\(nchwDiff), nhwcDiff=\(nhwcDiff), autoNCHW=\(autoNCHW)\n"
-                    diag += "Decision: useNCHW=\(useNCHW)\n"
-                    diag += "First 20 float16 values:\n"
-                    for vi in 0..<min(20, totalValues) { diag += "  [\(vi)] = \(f16ToFloat(float16Ptr, vi))\n" }
-                    try? diag.write(toFile: "/tmp/dts_tensor_diag.log", atomically: true, encoding: .utf8)
-
                     if useNCHW {
                         // NCHW planar: [RRR...][GGG...][BBB...]
                         for i in 0..<planeSize {
