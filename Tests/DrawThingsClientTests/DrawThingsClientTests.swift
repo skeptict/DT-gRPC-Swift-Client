@@ -383,9 +383,9 @@ final class DrawThingsClientTests: XCTestCase {
         XCTAssertLessThan(px3.r, 136, "Gray pixel R should be ~128")
     }
 
-    /// Diagnose TCD + z_image_turbo noise issue: compare gamma=0 vs gamma=0.3
-    /// If gamma=0 produces noise and gamma=0.3 produces a valid image, the fix is to enforce minimum gamma.
-    func testTCDGammaComparison() async throws {
+    /// Test with EXACT native Draw Things config for z_image_turbo + TCD.
+    /// Uses all fields from a known-working DT configuration JSON export.
+    func testExactNativeDTConfig() async throws {
         DrawThingsClientLogger.minimumLevel = .debug
 
         let service: DrawThingsService
@@ -396,96 +396,92 @@ final class DrawThingsClientTests: XCTestCase {
             throw XCTSkip("Draw Things gRPC not reachable")
         }
 
-        // Use currently loaded model (should be z_image_turbo or similar)
-        let gammaValues: [Float] = [0.0, 0.1, 0.3]
-        var results: [(gamma: Float, pixelDiff: Float, image: PlatformImage)] = []
+        // Exact config from native Draw Things that produces good results:
+        // z_image_turbo + TCD + SSS=0%
+        let config = DrawThingsConfiguration(
+            width: 1152,
+            height: 768,
+            steps: 8,
+            model: "z_image_turbo_1.0_q8p.ckpt",
+            sampler: .tcd,
+            guidanceScale: 1.0,
+            seed: 3352225928,
+            shift: 1.0,
+            strength: 1.0,
+            cfgZeroStar: true,
+            cfgZeroInitSteps: 0,
+            maskBlur: 10.0,
+            maskBlurOutset: 20,
+            preserveOriginalAfterInpaint: true,
+            sharpness: 0.0,
+            stochasticSamplingGamma: 0.0,
+            resolutionDependentShift: false,
+            t5TextEncoder: true,
+            tiledDiffusion: false,
+            tiledDecoding: false,
+            hiresFix: false,
+            seedMode: 2
+        )
 
-        for gamma in gammaValues {
-            print("\n[TCDGamma] Testing gamma=\(gamma)")
+        let configData = try config.toFlatBufferData()
+        print("[ExactConfig] FlatBuffer size: \(configData.count) bytes")
 
-            let config = DrawThingsConfiguration(
-                width: 512,
-                height: 512,
-                steps: 8,
-                model: "",  // Use currently loaded model
-                sampler: .tcd,
-                guidanceScale: 1.0,
-                seed: 42,  // Fixed seed for reproducibility
-                shift: 1.0,
-                stochasticSamplingGamma: gamma,
-                resolutionDependentShift: true,
-                t5TextEncoder: true,
-                seedMode: 2
-            )
+        // Hex dump first 200 bytes for diagnosis
+        let hexDump = configData.prefix(200).map { String(format: "%02x", $0) }.joined(separator: " ")
+        print("[ExactConfig] FlatBuffer hex (first 200): \(hexDump)")
 
-            let configData = try config.toFlatBufferData()
-            let tensorResults = try await service.generateImage(
-                prompt: "A small red cube on a white table",
-                negativePrompt: "",
-                configuration: configData,
-                progressHandler: { _ in }
-            )
+        // Generate
+        let tensorResults = try await service.generateImage(
+            prompt: "a dog with a yellow bandana",
+            negativePrompt: "",
+            configuration: configData,
+            progressHandler: { _ in }
+        )
 
-            guard let tensor = tensorResults.first else {
-                print("[TCDGamma] gamma=\(gamma): No result!")
-                continue
-            }
+        guard let tensor = tensorResults.first else {
+            XCTFail("No tensor result from generation")
+            return
+        }
 
-            let image = try ImageHelpers.dtTensorToImage(tensor)
-            print("[TCDGamma] gamma=\(gamma): image \(image.pixelWidth)x\(image.pixelHeight)")
+        let image = try ImageHelpers.dtTensorToImage(tensor)
+        print("[ExactConfig] Image: \(image.pixelWidth)x\(image.pixelHeight)")
 
-            // Save for visual inspection
-            if let pngData = image.pngData() {
-                let path = "/tmp/dts_tcd_gamma_\(String(format: "%.1f", gamma)).png"
-                try pngData.write(to: URL(fileURLWithPath: path))
-                print("[TCDGamma] Saved to \(path)")
-            }
+        if let pngData = image.pngData() {
+            try pngData.write(to: URL(fileURLWithPath: "/tmp/dts_exact_native_config.png"))
+            print("[ExactConfig] Saved to /tmp/dts_exact_native_config.png")
+        }
 
-            // Compute pixel-to-pixel quality metric (lower = smoother = better)
-            guard let cgImage = image.cgImageRepresentation else { continue }
-            let w = cgImage.width, h = cgImage.height
-            let bytesPerRow = w * 4
-            var pixelBuffer = [UInt8](repeating: 0, count: h * bytesPerRow)
-            guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
-                  let context = CGContext(
-                    data: &pixelBuffer, width: w, height: h,
-                    bitsPerComponent: 8, bytesPerRow: bytesPerRow, space: colorSpace,
-                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
-                  ) else { continue }
-            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: w, height: h))
+        // Compute smoothness metric
+        guard let cgImage = image.cgImageRepresentation else {
+            XCTFail("Cannot get CGImage"); return
+        }
+        let w = cgImage.width, h = cgImage.height
+        let bytesPerRow = w * 4
+        var pixelBuffer = [UInt8](repeating: 0, count: h * bytesPerRow)
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                data: &pixelBuffer, width: w, height: h,
+                bitsPerComponent: 8, bytesPerRow: bytesPerRow, space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+              ) else {
+            XCTFail("Cannot create bitmap context"); return
+        }
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: w, height: h))
 
-            // Compute mean absolute horizontal pixel difference
-            var totalDiff: Float = 0
-            var count: Int = 0
-            for y in 0..<h {
-                for x in 0..<(w - 1) {
-                    let idx1 = y * bytesPerRow + x * 4
-                    let idx2 = y * bytesPerRow + (x + 1) * 4
-                    for c in 0..<3 {
-                        totalDiff += abs(Float(pixelBuffer[idx1 + c]) - Float(pixelBuffer[idx2 + c]))
-                        count += 1
-                    }
+        var totalDiff: Float = 0
+        var count: Int = 0
+        for y in 0..<h {
+            for x in 0..<(w - 1) {
+                let idx1 = y * bytesPerRow + x * 4
+                let idx2 = y * bytesPerRow + (x + 1) * 4
+                for c in 0..<3 {
+                    totalDiff += abs(Float(pixelBuffer[idx1 + c]) - Float(pixelBuffer[idx2 + c]))
+                    count += 1
                 }
             }
-            let avgDiff = totalDiff / Float(count)
-            print("[TCDGamma] gamma=\(gamma): avg pixel diff = \(avgDiff) (< 5 = good, > 15 = noise)")
-
-            results.append((gamma: gamma, pixelDiff: avgDiff, image: image))
         }
-
-        // Print summary
-        print("\n[TCDGamma] === SUMMARY ===")
-        for r in results {
-            let quality = r.pixelDiff < 5 ? "GOOD" : (r.pixelDiff < 15 ? "OK" : "NOISE")
-            print("[TCDGamma] gamma=\(r.gamma): avgDiff=\(r.pixelDiff) → \(quality)")
-        }
-
-        // At least one gamma value should produce a valid image
-        let bestResult = results.min(by: { $0.pixelDiff < $1.pixelDiff })
-        if let best = bestResult {
-            print("[TCDGamma] Best gamma: \(best.gamma) with avgDiff=\(best.pixelDiff)")
-            XCTAssertLessThan(best.pixelDiff, 15, "At least one gamma value should produce a non-noisy image")
-        }
+        let avgDiff = totalDiff / Float(count)
+        print("[ExactConfig] Avg pixel diff: \(avgDiff) (< 5 = good, > 15 = noise)")
     }
 
     func testModelFamilyDetection() {
