@@ -568,8 +568,8 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
   public static func add(strength: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: strength, def: 0.0, at: VTOFFSET.strength.p) }
   public static func add(model: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: model, at: VTOFFSET.model.p) }
   public static func add(sampler: SamplerType, _ fbb: inout FlatBufferBuilder) { fbb.add(element: sampler.rawValue, def: 0, at: VTOFFSET.sampler.p) }
-  public static func add(batchCount: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: batchCount, def: 1, at: VTOFFSET.batchCount.p) }
-  public static func add(batchSize: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: batchSize, def: 1, at: VTOFFSET.batchSize.p) }
+  public static func add(batchCount: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: batchCount, def: 0, at: VTOFFSET.batchCount.p) }
+  public static func add(batchSize: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: batchSize, def: 0, at: VTOFFSET.batchSize.p) }
   public static func add(hiresFix: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: hiresFix, def: false,
    at: VTOFFSET.hiresFix.p) }
   public static func add(hiresFixStartWidth: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: hiresFixStartWidth, def: 0, at: VTOFFSET.hiresFixStartWidth.p) }
