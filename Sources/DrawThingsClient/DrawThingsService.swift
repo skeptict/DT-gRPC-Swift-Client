@@ -9,6 +9,7 @@
 //  See LICENSE file in the project root for license information.
 //
 
+import CryptoKit
 import Foundation
 import GRPC
 import NIO
@@ -112,14 +113,23 @@ public actor DrawThingsService {
 
             DrawThingsClientLogger.debug("Sending request: prompt='\(prompt)', config size=\(configuration.count) bytes")
 
+            // The ImageGenerationRequest uses content-addressable storage:
+            // - `image` / `mask` fields hold the SHA256 hash of the tensor data
+            // - `contents` holds the actual raw tensor bytes, indexed by their SHA256 hash
+            var casContents = contents
+
             if let image = image {
-                $0.image = image
-                DrawThingsClientLogger.debug("   Image data: \(image.count) bytes")
+                let hashData = Data(SHA256.hash(data: image))
+                $0.image = hashData
+                casContents.append(image)
+                DrawThingsClientLogger.debug("   Image data: \(image.count) bytes (sha256 referenced)")
             }
 
             if let mask = mask {
-                $0.mask = mask
-                DrawThingsClientLogger.debug("   Mask data: \(mask.count) bytes")
+                let hashData = Data(SHA256.hash(data: mask))
+                $0.mask = hashData
+                casContents.append(mask)
+                DrawThingsClientLogger.debug("   Mask data: \(mask.count) bytes (sha256 referenced)")
             }
 
             $0.hints = hints
@@ -132,7 +142,7 @@ public actor DrawThingsService {
                     }
                 }
             }
-            $0.contents = contents
+            $0.contents = casContents
             
             if let override = override {
                 $0.override = override
