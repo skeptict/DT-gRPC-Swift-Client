@@ -71,6 +71,10 @@ public struct DrawThingsConfiguration: Sendable {
     public var cfgZeroStar: Bool
     public var cfgZeroInitSteps: Int32
 
+    // Compression parameters
+    public var compressionArtifacts: CompressionMethod
+    public var compressionArtifactsQuality: Float
+
     // Mask/Inpaint parameters
     public var maskBlur: Float
     public var maskBlurOutset: Int32
@@ -194,6 +198,8 @@ public struct DrawThingsConfiguration: Sendable {
         speedUpWithGuidanceEmbed: Bool = true,
         cfgZeroStar: Bool = false,
         cfgZeroInitSteps: Int32 = 0,
+        compressionArtifacts: CompressionMethod = .disabled,
+        compressionArtifactsQuality: Float = 43.1,
         maskBlur: Float = 1.5,
         maskBlurOutset: Int32 = 0,
         preserveOriginalAfterInpaint: Bool = true,
@@ -277,6 +283,8 @@ public struct DrawThingsConfiguration: Sendable {
         self.speedUpWithGuidanceEmbed = speedUpWithGuidanceEmbed
         self.cfgZeroStar = cfgZeroStar
         self.cfgZeroInitSteps = cfgZeroInitSteps
+        self.compressionArtifacts = compressionArtifacts
+        self.compressionArtifactsQuality = compressionArtifactsQuality
         self.maskBlur = maskBlur
         self.maskBlurOutset = maskBlurOutset
         self.preserveOriginalAfterInpaint = preserveOriginalAfterInpaint
@@ -380,6 +388,10 @@ public struct DrawThingsConfiguration: Sendable {
         configT.speedUpWithGuidanceEmbed = speedUpWithGuidanceEmbed
         configT.cfgZeroStar = cfgZeroStar
         configT.cfgZeroInitSteps = cfgZeroInitSteps
+
+        // Compression parameters
+        configT.compressionArtifacts = self.compressionArtifacts
+        configT.compressionArtifactsQuality = self.compressionArtifactsQuality
 
         // Mask/Inpaint parameters
         configT.maskBlur = maskBlur
