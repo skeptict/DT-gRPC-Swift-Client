@@ -31,8 +31,9 @@ public enum SamplerType: Int8, Enum, Verifiable {
   case ddimtrailing = 16
   case unipctrailing = 17
   case unipcays = 18
+  case tcdtrailing = 19
 
-  public static var max: SamplerType { return .unipcays }
+  public static var max: SamplerType { return .tcdtrailing }
   public static var min: SamplerType { return .dpmpp2mkarras }
 }
 
@@ -103,6 +104,20 @@ public enum LoRAMode: Int8, Enum, Verifiable {
 
   public static var max: LoRAMode { return .refiner }
   public static var min: LoRAMode { return .all }
+}
+
+
+public enum CompressionMethod: Int8, Enum, Verifiable {
+  public typealias T = Int8
+  public static var byteSize: Int { return MemoryLayout<Int8>.size }
+  public var value: Int8 { return self.rawValue }
+  case disabled = 0
+  case h264 = 1
+  case h265 = 2
+  case jpeg = 3
+
+  public static var max: CompressionMethod { return .jpeg }
+  public static var min: CompressionMethod { return .disabled }
 }
 
 
@@ -460,6 +475,8 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
     case causalInferencePad = 166
     case cfgZeroStar = 168
     case cfgZeroInitSteps = 170
+    case compressionArtifacts = 172
+    case compressionArtifactsQuality = 174
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
@@ -558,7 +575,9 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
   public var causalInferencePad: Int32 { let o = _accessor.offset(VTOFFSET.causalInferencePad.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
   public var cfgZeroStar: Bool { let o = _accessor.offset(VTOFFSET.cfgZeroStar.v); return o == 0 ? false : _accessor.readBuffer(of: Bool.self, at: o) }
   public var cfgZeroInitSteps: Int32 { let o = _accessor.offset(VTOFFSET.cfgZeroInitSteps.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
-  public static func startGenerationConfiguration(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 84) }
+  public var compressionArtifacts: CompressionMethod { let o = _accessor.offset(VTOFFSET.compressionArtifacts.v); return o == 0 ? .disabled : CompressionMethod(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .disabled }
+  public var compressionArtifactsQuality: Float32 { let o = _accessor.offset(VTOFFSET.compressionArtifactsQuality.v); return o == 0 ? 43.1 : _accessor.readBuffer(of: Float32.self, at: o) }
+  public static func startGenerationConfiguration(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 86) }
   public static func add(id: Int64, _ fbb: inout FlatBufferBuilder) { fbb.add(element: id, def: 0, at: VTOFFSET.id.p) }
   public static func add(startWidth: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: startWidth, def: 0, at: VTOFFSET.startWidth.p) }
   public static func add(startHeight: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: startHeight, def: 0, at: VTOFFSET.startHeight.p) }
@@ -656,6 +675,8 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
   public static func add(cfgZeroStar: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cfgZeroStar, def: false,
    at: VTOFFSET.cfgZeroStar.p) }
   public static func add(cfgZeroInitSteps: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cfgZeroInitSteps, def: 0, at: VTOFFSET.cfgZeroInitSteps.p) }
+  public static func add(compressionArtifacts: CompressionMethod, _ fbb: inout FlatBufferBuilder) { fbb.add(element: compressionArtifacts.rawValue, def: 0, at: VTOFFSET.compressionArtifacts.p) }
+  public static func add(compressionArtifactsQuality: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: compressionArtifactsQuality, def: 43.1, at: VTOFFSET.compressionArtifactsQuality.p) }
   public static func endGenerationConfiguration(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
   public static func createGenerationConfiguration(
     _ fbb: inout FlatBufferBuilder,
@@ -740,7 +761,9 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
     causalInference: Int32 = 3,
     causalInferencePad: Int32 = 0,
     cfgZeroStar: Bool = false,
-    cfgZeroInitSteps: Int32 = 0
+    cfgZeroInitSteps: Int32 = 0,
+    compressionArtifacts: CompressionMethod = .disabled,
+    compressionArtifactsQuality: Float32 = 43.1
   ) -> Offset {
     let __start = GenerationConfiguration.startGenerationConfiguration(&fbb)
     GenerationConfiguration.add(id: id, &fbb)
@@ -825,9 +848,11 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
     GenerationConfiguration.add(causalInferencePad: causalInferencePad, &fbb)
     GenerationConfiguration.add(cfgZeroStar: cfgZeroStar, &fbb)
     GenerationConfiguration.add(cfgZeroInitSteps: cfgZeroInitSteps, &fbb)
+    GenerationConfiguration.add(compressionArtifacts: compressionArtifacts, &fbb)
+    GenerationConfiguration.add(compressionArtifactsQuality: compressionArtifactsQuality, &fbb)
     return GenerationConfiguration.endGenerationConfiguration(&fbb, start: __start)
   }
-  
+
 
   public mutating func unpack() -> GenerationConfigurationT {
     return GenerationConfigurationT(&self)
@@ -987,6 +1012,8 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
     GenerationConfiguration.add(causalInferencePad: obj.causalInferencePad, &builder)
     GenerationConfiguration.add(cfgZeroStar: obj.cfgZeroStar, &builder)
     GenerationConfiguration.add(cfgZeroInitSteps: obj.cfgZeroInitSteps, &builder)
+    GenerationConfiguration.add(compressionArtifacts: obj.compressionArtifacts, &builder)
+    GenerationConfiguration.add(compressionArtifactsQuality: obj.compressionArtifactsQuality, &builder)
     return GenerationConfiguration.endGenerationConfiguration(&builder, start: __root)
   }
 
@@ -1074,6 +1101,8 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
     try _v.visit(field: VTOFFSET.causalInferencePad.p, fieldName: "causalInferencePad", required: false, type: Int32.self)
     try _v.visit(field: VTOFFSET.cfgZeroStar.p, fieldName: "cfgZeroStar", required: false, type: Bool.self)
     try _v.visit(field: VTOFFSET.cfgZeroInitSteps.p, fieldName: "cfgZeroInitSteps", required: false, type: Int32.self)
+    try _v.visit(field: VTOFFSET.compressionArtifacts.p, fieldName: "compressionArtifacts", required: false, type: CompressionMethod.self)
+    try _v.visit(field: VTOFFSET.compressionArtifactsQuality.p, fieldName: "compressionArtifactsQuality", required: false, type: Float32.self)
     _v.finish()
   }
 }
@@ -1162,6 +1191,8 @@ public class GenerationConfigurationT: NativeObject {
   public var causalInferencePad: Int32
   public var cfgZeroStar: Bool
   public var cfgZeroInitSteps: Int32
+  public var compressionArtifacts: CompressionMethod
+  public var compressionArtifactsQuality: Float32
 
   public init(_ _t: inout GenerationConfiguration) {
     id = _t.id
@@ -1254,6 +1285,8 @@ public class GenerationConfigurationT: NativeObject {
     causalInferencePad = _t.causalInferencePad
     cfgZeroStar = _t.cfgZeroStar
     cfgZeroInitSteps = _t.cfgZeroInitSteps
+    compressionArtifacts = _t.compressionArtifacts
+    compressionArtifactsQuality = _t.compressionArtifactsQuality
   }
 
   public init() {
@@ -1331,6 +1364,8 @@ public class GenerationConfigurationT: NativeObject {
     causalInferencePad = 0
     cfgZeroStar = false
     cfgZeroInitSteps = 0
+    compressionArtifacts = .disabled
+    compressionArtifactsQuality = 43.1
   }
 
   public func serialize() -> ByteBuffer { return serialize(type: GenerationConfiguration.self) }

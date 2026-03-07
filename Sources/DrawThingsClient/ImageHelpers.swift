@@ -47,6 +47,10 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
     case wan21
     /// Wan 2.2 5B model (48-channel latent)
     case wan22
+    /// Flux 2 models (32-channel latent)
+    case flux2
+    /// LTX-2 models (16-channel latent, TAESD-only preview)
+    case ltx2
     /// Unknown model - will use default coefficients
     case unknown
 
@@ -64,6 +68,10 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
             return .qwen
         case "zimage":
             return .zImage
+        case "flux2", "flux2_9b", "flux2_4b":
+            return .flux2
+        case "ltx2":
+            return .ltx2
         case "flux1", "hidreami1":
             return .flux
         case "wan21_1_3b", "wan21_14b":
@@ -83,6 +91,12 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
         }
 
         // Fall back to substring matching for filenames
+        if lowercased.contains("flux2") {
+            return .flux2
+        }
+        if lowercased.contains("ltx2") || lowercased.contains("ltx-2") || lowercased.contains("ltx_2") {
+            return .ltx2
+        }
         if lowercased.contains("flux") || lowercased.contains("hidream") {
             return .flux
         }
@@ -121,8 +135,10 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
         switch self {
         case .sd1, .sdxl:
             return 4
-        case .sd3, .flux, .hunyuanVideo, .qwen, .zImage, .wan21:
+        case .sd3, .flux, .hunyuanVideo, .qwen, .zImage, .wan21, .ltx2:
             return 16
+        case .flux2:
+            return 32
         case .wan22:
             return 48
         case .unknown:
@@ -461,7 +477,7 @@ public struct ImageHelpers {
             throw ImageError.compressionNotSupported
         }
 
-        guard channels == 3 || channels == 4 || channels == 16 || channels == 48 else {
+        guard channels == 3 || channels == 4 || channels == 16 || channels == 32 || channels == 48 else {
             DrawThingsClientLogger.error("dtTensorToImage: unsupported channel count \(channels)")
             throw ImageError.conversionFailed
         }
@@ -489,6 +505,10 @@ public struct ImageHelpers {
                     // 48-channel latent space to RGB (Wan 2.2 5B coefficients)
                     DrawThingsClientLogger.debug("dtTensorToImage: using 48-channel Wan 2.2 conversion")
                     convert48ChannelToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
+                } else if channels == 32 {
+                    // 32-channel latent space to RGB (Flux 2 coefficients)
+                    DrawThingsClientLogger.debug("dtTensorToImage: using 32-channel Flux 2 conversion")
+                    convertFlux2ToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
                 } else if channels == 16 {
                     // 16-channel latent space to RGB - use model-specific coefficients
                     let family = modelFamily ?? .flux
@@ -502,6 +522,10 @@ public struct ImageHelpers {
                     case .hunyuanVideo:
                         DrawThingsClientLogger.debug("dtTensorToImage: using HunyuanVideo 16-channel conversion")
                         convertHunyuanVideoToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
+                    case .ltx2:
+                        // LTX-2 uses Flux-like coefficients as a reasonable fallback
+                        DrawThingsClientLogger.debug("dtTensorToImage: using Flux 16-channel conversion for LTX-2 fallback")
+                        convertFluxToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
                     case .flux, .zImage, .unknown:
                         // Z Image uses Flux-like latent space
                         DrawThingsClientLogger.debug("dtTensorToImage: using Flux 16-channel conversion (family=\(family))")
@@ -803,6 +827,80 @@ public struct ImageHelpers {
             bVal += -0.0328 * v4 - 0.0665 * v5 - 0.2925 * v6 + 0.1975 * v7
             bVal += -0.1364 * v8 + 0.1636 * v9 + 0.1128 * v10 + 0.0639 * v11
             bVal += 0.1699 * v12 + 0.0005 * v13 + 0.2950 * v14 + 0.1861 * v15 - 0.336
+            let b = bVal * 127.5 + 127.5
+
+            uint8Ptr[i * 3 + 0] = UInt8(clamping: Int(r.isFinite ? r : 0))
+            uint8Ptr[i * 3 + 1] = UInt8(clamping: Int(g.isFinite ? g : 0))
+            uint8Ptr[i * 3 + 2] = UInt8(clamping: Int(b.isFinite ? b : 0))
+        }
+    }
+
+    /// Convert 32-channel Flux 2 latent to RGB
+    private static func convertFlux2ToRGB(float16Ptr: UnsafePointer<UInt16>, uint8Ptr: UnsafeMutablePointer<UInt8>, pixelCount: Int) {
+        for i in 0..<pixelCount {
+            let base = i * 32
+            let v0 = f16ToFloat(float16Ptr, base + 0)
+            let v1 = f16ToFloat(float16Ptr, base + 1)
+            let v2 = f16ToFloat(float16Ptr, base + 2)
+            let v3 = f16ToFloat(float16Ptr, base + 3)
+            let v4 = f16ToFloat(float16Ptr, base + 4)
+            let v5 = f16ToFloat(float16Ptr, base + 5)
+            let v6 = f16ToFloat(float16Ptr, base + 6)
+            let v7 = f16ToFloat(float16Ptr, base + 7)
+            let v8 = f16ToFloat(float16Ptr, base + 8)
+            let v9 = f16ToFloat(float16Ptr, base + 9)
+            let v10 = f16ToFloat(float16Ptr, base + 10)
+            let v11 = f16ToFloat(float16Ptr, base + 11)
+            let v12 = f16ToFloat(float16Ptr, base + 12)
+            let v13 = f16ToFloat(float16Ptr, base + 13)
+            let v14 = f16ToFloat(float16Ptr, base + 14)
+            let v15 = f16ToFloat(float16Ptr, base + 15)
+            let v16 = f16ToFloat(float16Ptr, base + 16)
+            let v17 = f16ToFloat(float16Ptr, base + 17)
+            let v18 = f16ToFloat(float16Ptr, base + 18)
+            let v19 = f16ToFloat(float16Ptr, base + 19)
+            let v20 = f16ToFloat(float16Ptr, base + 20)
+            let v21 = f16ToFloat(float16Ptr, base + 21)
+            let v22 = f16ToFloat(float16Ptr, base + 22)
+            let v23 = f16ToFloat(float16Ptr, base + 23)
+            let v24 = f16ToFloat(float16Ptr, base + 24)
+            let v25 = f16ToFloat(float16Ptr, base + 25)
+            let v26 = f16ToFloat(float16Ptr, base + 26)
+            let v27 = f16ToFloat(float16Ptr, base + 27)
+            let v28 = f16ToFloat(float16Ptr, base + 28)
+            let v29 = f16ToFloat(float16Ptr, base + 29)
+            let v30 = f16ToFloat(float16Ptr, base + 30)
+            let v31 = f16ToFloat(float16Ptr, base + 31)
+
+            // Flux 2 coefficients
+            var rVal: Float = 0.0058 * v0 + 0.0495 * v1 - 0.0099 * v2 + 0.2144 * v3
+            rVal += 0.0166 * v4 + 0.0157 * v5 - 0.0398 * v6 - 0.0052 * v7
+            rVal += -0.3527 * v8 - 0.0301 * v9 - 0.0107 * v10 + 0.0746 * v11
+            rVal += 0.0156 * v12 - 0.0034 * v13 + 0.0032 * v14 - 0.0939 * v15
+            rVal += 0.0018 * v16 + 0.0284 * v17 - 0.0024 * v18 + 0.1207 * v19
+            rVal += 0.0128 * v20 + 0.0137 * v21 + 0.0095 * v22 + 0.0000 * v23
+            rVal += -0.0465 * v24 + 0.0095 * v25 + 0.0290 * v26 + 0.0220 * v27
+            rVal += -0.0332 * v28 - 0.0085 * v29 - 0.0076 * v30 - 0.0111 * v31 - 0.0329
+            let r = rVal * 127.5 + 127.5
+
+            var gVal: Float = 0.0113 * v0 + 0.0443 * v1 + 0.0096 * v2 + 0.3009 * v3
+            gVal += -0.0039 * v4 + 0.0103 * v5 + 0.0902 * v6 + 0.0095 * v7
+            gVal += -0.2712 * v8 - 0.0356 * v9 + 0.0078 * v10 + 0.0090 * v11
+            gVal += 0.0169 * v12 - 0.0040 * v13 + 0.0181 * v14 - 0.0008 * v15
+            gVal += 0.0043 * v16 + 0.0056 * v17 - 0.0022 * v18 - 0.0026 * v19
+            gVal += 0.0101 * v20 - 0.0072 * v21 + 0.0092 * v22 - 0.0077 * v23
+            gVal += -0.0204 * v24 + 0.0012 * v25 - 0.0034 * v26 + 0.0169 * v27
+            gVal += -0.0457 * v28 + 0.0389 * v29 + 0.0003 * v30 - 0.0460 * v31 - 0.0718
+            let g = gVal * 127.5 + 127.5
+
+            var bVal: Float = 0.0073 * v0 + 0.0836 * v1 + 0.0644 * v2 + 0.3652 * v3
+            bVal += -0.0054 * v4 - 0.0160 * v5 - 0.0235 * v6 + 0.0109 * v7
+            bVal += -0.1666 * v8 - 0.0180 * v9 + 0.0013 * v10 - 0.0941 * v11
+            bVal += 0.0070 * v12 - 0.0114 * v13 + 0.0080 * v14 + 0.0186 * v15
+            bVal += 0.0104 * v16 - 0.0127 * v17 - 0.0030 * v18 + 0.0065 * v19
+            bVal += 0.0142 * v20 - 0.0007 * v21 - 0.0059 * v22 - 0.0049 * v23
+            bVal += -0.0312 * v24 - 0.0066 * v25 + 0.0025 * v26 - 0.0048 * v27
+            bVal += -0.0468 * v28 + 0.0609 * v29 - 0.0043 * v30 - 0.0614 * v31 - 0.0851
             let b = bVal * 127.5 + 127.5
 
             uint8Ptr[i * 3 + 0] = UInt8(clamping: Int(r.isFinite ? r : 0))
