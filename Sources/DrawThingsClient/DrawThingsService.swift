@@ -15,6 +15,11 @@ import NIO
 import NIOSSL
 import SwiftProtobuf
 
+public struct GenerationResult: Sendable {
+    public let images: [Data]
+    public let audio: [Data]
+}
+
 public actor DrawThingsService {
     private let client: ImageGenerationServiceClient
     private let group: EventLoopGroup
@@ -95,7 +100,7 @@ public actor DrawThingsService {
         scaleFactor: Int32 = 1,
         progressHandler: @escaping (ImageGenerationSignpostProto?) async -> Void = { _ in },
         previewHandler: @escaping (Data) async -> Void = { _ in }
-    ) async throws -> [Data] {
+    ) async throws -> GenerationResult {
         
         // Ensure we have models metadata
         if self.models == nil {
@@ -139,10 +144,15 @@ public actor DrawThingsService {
             } else if let cachedModels = self.models {
                 $0.override = cachedModels
             }
+
+            $0.chunked = true
         }
         
         return try await withCheckedThrowingContinuation { continuation in
             var generatedImages: [Data] = []
+            var generatedAudio: [Data] = []
+            var lastImageChunk = Data()
+            var lastAudioChunk = Data()
             var lastPreviewImage: Data?
             var expectedDownloadSize: Int64?
             var hasResumed = false
@@ -152,6 +162,8 @@ public actor DrawThingsService {
                 responseCount += 1
                 DrawThingsClientLogger.debug("Response #\(responseCount) received:")
                 DrawThingsClientLogger.debug("   - generatedImages.count: \(response.generatedImages.count)")
+                DrawThingsClientLogger.debug("   - generatedAudio.count: \(response.generatedAudio.count)")
+                DrawThingsClientLogger.debug("   - chunkState: \(response.chunkState)")
                 DrawThingsClientLogger.debug("   - hasCurrentSignpost: \(response.hasCurrentSignpost)")
                 DrawThingsClientLogger.debug("   - hasDownloadSize: \(response.hasDownloadSize)")
                 DrawThingsClientLogger.debug("   - hasPreviewImage: \(response.hasPreviewImage)")
@@ -202,18 +214,43 @@ public actor DrawThingsService {
                     }
                 }
 
-                // Collect generated images (if server sends them directly)
+                // Collect generated images with chunk reassembly
                 if !response.generatedImages.isEmpty {
-                    DrawThingsClientLogger.debug("Received \(response.generatedImages.count) image(s):")
-                    for (idx, img) in response.generatedImages.enumerated() {
-                        DrawThingsClientLogger.debug("   - Image \(idx): \(img.count) bytes")
+                    var images = response.generatedImages
+                    if response.chunkState == .lastChunk {
+                        if !lastImageChunk.isEmpty {
+                            images[0] = lastImageChunk + images[0]
+                            lastImageChunk = Data()
+                        }
+                        DrawThingsClientLogger.debug("Received \(images.count) image(s) (final chunk):")
+                        for (idx, img) in images.enumerated() {
+                            DrawThingsClientLogger.debug("   - Image \(idx): \(img.count) bytes")
+                        }
+                        generatedImages.append(contentsOf: images)
+                    } else {
+                        // More chunks coming — accumulate
+                        for img in images {
+                            lastImageChunk.append(img)
+                        }
+                        DrawThingsClientLogger.debug("Accumulated image chunk: \(lastImageChunk.count) bytes so far")
                     }
-                    generatedImages.append(contentsOf: response.generatedImages)
+                }
 
-                    let totalReceived = generatedImages.reduce(0) { $0 + $1.count }
-                    DrawThingsClientLogger.debug("Total image data received so far: \(totalReceived) bytes")
-                    if let expectedSize = expectedDownloadSize, totalReceived >= expectedSize {
-                        DrawThingsClientLogger.debug("Received all expected data (\(totalReceived) bytes)")
+                // Collect generated audio with chunk reassembly
+                if !response.generatedAudio.isEmpty {
+                    var audio = response.generatedAudio
+                    if response.chunkState == .lastChunk {
+                        if !lastAudioChunk.isEmpty {
+                            audio[0] = lastAudioChunk + audio[0]
+                            lastAudioChunk = Data()
+                        }
+                        DrawThingsClientLogger.debug("Received \(audio.count) audio tensor(s) (final chunk)")
+                        generatedAudio.append(contentsOf: audio)
+                    } else {
+                        for a in audio {
+                            lastAudioChunk.append(a)
+                        }
+                        DrawThingsClientLogger.debug("Accumulated audio chunk: \(lastAudioChunk.count) bytes so far")
                     }
                 }
             }
@@ -236,12 +273,12 @@ public actor DrawThingsService {
                         generatedImages.append(lastPreviewImage!)
                     }
 
-                    DrawThingsClientLogger.debug("Total images to return: \(generatedImages.count)")
+                    DrawThingsClientLogger.debug("Total images to return: \(generatedImages.count), audio: \(generatedAudio.count)")
                     if generatedImages.isEmpty && expectedDownloadSize != nil {
                         DrawThingsClientLogger.notice("Warning: Server indicated \(expectedDownloadSize!) bytes but no images received")
                         DrawThingsClientLogger.info("The server may require a separate request to fetch the image data")
                     }
-                    continuation.resume(returning: generatedImages)
+                    continuation.resume(returning: GenerationResult(images: generatedImages, audio: generatedAudio))
                 case .failure(let err):
                     DrawThingsClientLogger.error("gRPC call failed: \(err)")
                     continuation.resume(throwing: err)
