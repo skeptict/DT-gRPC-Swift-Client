@@ -4,7 +4,7 @@
 
 # DrawThingsClient
 
-**No longer in use** A Swift client library for interacting with Draw Things gRPC server, designed for easy integration with SwiftUI applications on macOS and iOS.
+**No longer in use.** A Swift client library for interacting with Draw Things gRPC server, designed for easy integration with SwiftUI applications on macOS and iOS.
 
 ## Features
 
