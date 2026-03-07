@@ -54,8 +54,47 @@ public class DrawThingsClient: ObservableObject {
         configuration: DrawThingsConfiguration = DrawThingsConfiguration(),
         image: PlatformImage? = nil,
         mask: PlatformImage? = nil
-    ) async throws -> GenerationOutput {
+    ) async throws -> [PlatformImage] {
+        let result = try await performGeneration(
+            prompt: prompt,
+            negativePrompt: negativePrompt,
+            configuration: configuration,
+            image: image,
+            mask: mask
+        )
+        return try result.images.map { try ImageHelpers.dtTensorToImage($0) }
+    }
 
+    public func generateImageAndAudio(
+        prompt: String,
+        negativePrompt: String = "",
+        configuration: DrawThingsConfiguration = DrawThingsConfiguration(),
+        image: PlatformImage? = nil,
+        mask: PlatformImage? = nil
+    ) async throws -> GenerationOutput {
+        let result = try await performGeneration(
+            prompt: prompt,
+            negativePrompt: negativePrompt,
+            configuration: configuration,
+            image: image,
+            mask: mask
+        )
+
+        let images = try result.images.map { try ImageHelpers.dtTensorToImage($0) }
+        let audioBuffers = result.audio.compactMap { data in
+            try? AudioHelpers.ccvTensorToAudioBuffer(data)
+        }
+
+        return GenerationOutput(images: images, audio: audioBuffers)
+    }
+
+    private func performGeneration(
+        prompt: String,
+        negativePrompt: String,
+        configuration: DrawThingsConfiguration,
+        image: PlatformImage?,
+        mask: PlatformImage?
+    ) async throws -> GenerationResult {
         currentProgress = ImageGenerationProgress()
 
         let configData = try configuration.toFlatBufferData()
@@ -63,7 +102,6 @@ public class DrawThingsClient: ObservableObject {
         var imageData: Data?
         var maskData: Data?
 
-        // Convert images to DTTensor format (required by Draw Things server)
         if let image = image {
             imageData = try ImageHelpers.imageToDTTensor(image, forceRGB: true)
         }
@@ -86,16 +124,7 @@ public class DrawThingsClient: ObservableObject {
         )
 
         currentProgress = nil
-
-        // Convert DTTensor results back to PlatformImage
-        let images = try result.images.map { try ImageHelpers.dtTensorToImage($0) }
-
-        // Convert audio tensors to AVAudioPCMBuffer
-        let audioBuffers = result.audio.compactMap { data in
-            try? AudioHelpers.ccvTensorToAudioBuffer(data)
-        }
-
-        return GenerationOutput(images: images, audio: audioBuffers)
+        return result
     }
     
     private func updateProgress(_ signpost: ImageGenerationSignpostProto?) {
