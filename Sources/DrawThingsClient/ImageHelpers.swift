@@ -469,9 +469,11 @@ public struct ImageHelpers {
         }
 
         let compressionFlag = header[0]
+        let format = header[2]  // 0x02 = NHWC, other = NCHW
         let height = Int(header[6])
         let width = Int(header[7])
         let channels = Int(header[8])
+        let isNHWC = (format == 0x02)
 
         if compressionFlag == 1012247 {
             throw ImageError.compressionNotSupported
@@ -541,7 +543,12 @@ public struct ImageHelpers {
                     convert4ChannelToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
                 } else {
                     // 3-channel RGB: Convert from [-1, 1] to [0, 255]
-                    convert3ChannelToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height * channels)
+                    if isNHWC {
+                        convert3ChannelToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height * channels)
+                    } else {
+                        // NCHW (planar): channels are stored as [R...R, G...G, B...B]
+                        convert3ChannelNCHWToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, width: width, height: height)
+                    }
                 }
             }
         }
@@ -646,12 +653,26 @@ public struct ImageHelpers {
         }
     }
 
-    /// Convert 3-channel RGB from [-1, 1] to [0, 255]
+    /// Convert 3-channel RGB from [-1, 1] to [0, 255] (NHWC / interleaved layout)
     private static func convert3ChannelToRGB(float16Ptr: UnsafePointer<UInt16>, uint8Ptr: UnsafeMutablePointer<UInt8>, pixelCount: Int) {
         for i in 0..<pixelCount {
             let floatValue = f16ToFloat(float16Ptr, i)
             let uint8Value = UInt8(clamping: Int(floatValue.isFinite ? (floatValue + 1.0) * 127.5 : 127.5))
             uint8Ptr[i] = uint8Value
+        }
+    }
+
+    /// Convert 3-channel RGB from [-1, 1] to [0, 255] (NCHW / planar layout)
+    /// Planar data is stored as [R0..RN, G0..GN, B0..BN] and must be interleaved to [R0,G0,B0, R1,G1,B1, ...]
+    private static func convert3ChannelNCHWToRGB(float16Ptr: UnsafePointer<UInt16>, uint8Ptr: UnsafeMutablePointer<UInt8>, width: Int, height: Int) {
+        let pixelCount = width * height
+        for i in 0..<pixelCount {
+            let rVal = f16ToFloat(float16Ptr, i)
+            let gVal = f16ToFloat(float16Ptr, pixelCount + i)
+            let bVal = f16ToFloat(float16Ptr, 2 * pixelCount + i)
+            uint8Ptr[i * 3]     = UInt8(clamping: Int(rVal.isFinite ? (rVal + 1.0) * 127.5 : 127.5))
+            uint8Ptr[i * 3 + 1] = UInt8(clamping: Int(gVal.isFinite ? (gVal + 1.0) * 127.5 : 127.5))
+            uint8Ptr[i * 3 + 2] = UInt8(clamping: Int(bVal.isFinite ? (bVal + 1.0) * 127.5 : 127.5))
         }
     }
 
