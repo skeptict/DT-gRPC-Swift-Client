@@ -55,14 +55,14 @@ public class DrawThingsClient: ObservableObject {
         image: PlatformImage? = nil,
         mask: PlatformImage? = nil
     ) async throws -> [PlatformImage] {
-        let result = try await performGeneration(
+        let resultData = try await callService(
             prompt: prompt,
             negativePrompt: negativePrompt,
             configuration: configuration,
             image: image,
             mask: mask
         )
-        return try result.images.map { try ImageHelpers.dtTensorToImage($0) }
+        return try resultData.map { try ImageHelpers.dtTensorToImage($0) }
     }
 
     public func generateImageAndAudio(
@@ -72,29 +72,33 @@ public class DrawThingsClient: ObservableObject {
         image: PlatformImage? = nil,
         mask: PlatformImage? = nil
     ) async throws -> GenerationOutput {
-        let result = try await performGeneration(
+        var audioBuffers: [AVAudioPCMBuffer] = []
+
+        let resultData = try await callService(
             prompt: prompt,
             negativePrompt: negativePrompt,
             configuration: configuration,
             image: image,
-            mask: mask
+            mask: mask,
+            audioHandler: { audioData in
+                if let buffer = try? AudioHelpers.ccvTensorToAudioBuffer(audioData) {
+                    audioBuffers.append(buffer)
+                }
+            }
         )
 
-        let images = try result.images.map { try ImageHelpers.dtTensorToImage($0) }
-        let audioBuffers = result.audio.compactMap { data in
-            try? AudioHelpers.ccvTensorToAudioBuffer(data)
-        }
-
+        let images = try resultData.map { try ImageHelpers.dtTensorToImage($0) }
         return GenerationOutput(images: images, audio: audioBuffers)
     }
 
-    private func performGeneration(
+    private func callService(
         prompt: String,
         negativePrompt: String,
         configuration: DrawThingsConfiguration,
         image: PlatformImage?,
-        mask: PlatformImage?
-    ) async throws -> GenerationResult {
+        mask: PlatformImage?,
+        audioHandler: @escaping (Data) async -> Void = { _ in }
+    ) async throws -> [Data] {
         currentProgress = ImageGenerationProgress()
 
         let configData = try configuration.toFlatBufferData()
@@ -120,7 +124,8 @@ public class DrawThingsClient: ObservableObject {
                 await MainActor.run {
                     self?.updateProgress(signpost)
                 }
-            }
+            },
+            audioHandler: audioHandler
         )
 
         currentProgress = nil

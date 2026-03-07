@@ -15,11 +15,6 @@ import NIO
 import NIOSSL
 import SwiftProtobuf
 
-public struct GenerationResult: Sendable {
-    public let images: [Data]
-    public let audio: [Data]
-}
-
 public actor DrawThingsService {
     private let client: ImageGenerationServiceClient
     private let group: EventLoopGroup
@@ -99,8 +94,9 @@ public actor DrawThingsService {
         override: MetadataOverride? = nil,
         scaleFactor: Int32 = 1,
         progressHandler: @escaping (ImageGenerationSignpostProto?) async -> Void = { _ in },
-        previewHandler: @escaping (Data) async -> Void = { _ in }
-    ) async throws -> GenerationResult {
+        previewHandler: @escaping (Data) async -> Void = { _ in },
+        audioHandler: @escaping (Data) async -> Void = { _ in }
+    ) async throws -> [Data] {
         
         // Ensure we have models metadata
         if self.models == nil {
@@ -150,7 +146,6 @@ public actor DrawThingsService {
         
         return try await withCheckedThrowingContinuation { continuation in
             var generatedImages: [Data] = []
-            var generatedAudio: [Data] = []
             var lastImageChunk = Data()
             var lastAudioChunk = Data()
             var lastPreviewImage: Data?
@@ -236,7 +231,7 @@ public actor DrawThingsService {
                     }
                 }
 
-                // Collect generated audio with chunk reassembly
+                // Deliver generated audio with chunk reassembly via callback
                 if !response.generatedAudio.isEmpty {
                     var audio = response.generatedAudio
                     if response.chunkState == .lastChunk {
@@ -245,7 +240,11 @@ public actor DrawThingsService {
                             lastAudioChunk = Data()
                         }
                         DrawThingsClientLogger.debug("Received \(audio.count) audio tensor(s) (final chunk)")
-                        generatedAudio.append(contentsOf: audio)
+                        for audioData in audio {
+                            Task {
+                                await audioHandler(audioData)
+                            }
+                        }
                     } else {
                         for a in audio {
                             lastAudioChunk.append(a)
@@ -273,12 +272,12 @@ public actor DrawThingsService {
                         generatedImages.append(lastPreviewImage!)
                     }
 
-                    DrawThingsClientLogger.debug("Total images to return: \(generatedImages.count), audio: \(generatedAudio.count)")
+                    DrawThingsClientLogger.debug("Total images to return: \(generatedImages.count)")
                     if generatedImages.isEmpty && expectedDownloadSize != nil {
                         DrawThingsClientLogger.notice("Warning: Server indicated \(expectedDownloadSize!) bytes but no images received")
                         DrawThingsClientLogger.info("The server may require a separate request to fetch the image data")
                     }
-                    continuation.resume(returning: GenerationResult(images: generatedImages, audio: generatedAudio))
+                    continuation.resume(returning: generatedImages)
                 case .failure(let err):
                     DrawThingsClientLogger.error("gRPC call failed: \(err)")
                     continuation.resume(throwing: err)
