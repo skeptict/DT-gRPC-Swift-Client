@@ -47,7 +47,8 @@ public class DrawThingsClient: ObservableObject {
         negativePrompt: String = "",
         configuration: DrawThingsConfiguration = DrawThingsConfiguration(),
         image: PlatformImage? = nil,
-        mask: PlatformImage? = nil
+        mask: PlatformImage? = nil,
+        hints: [HintProto] = []
     ) async throws -> [PlatformImage] {
 
         currentProgress = ImageGenerationProgress()
@@ -72,6 +73,7 @@ public class DrawThingsClient: ObservableObject {
             configuration: configData,
             image: imageData,
             mask: maskData,
+            hints: hints,
             progressHandler: { [weak self] signpost in
                 await MainActor.run {
                     self?.updateProgress(signpost)
