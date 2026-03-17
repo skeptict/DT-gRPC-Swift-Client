@@ -225,6 +225,7 @@ Samplers are represented as integers in the configuration:
 | `ddimtrailing` | `16` |
 | `unipctrailing` | `17` |
 | `unipcays` | `18` |
+| `tcdtrailing` | `19` |
 
 ## Installation
 
