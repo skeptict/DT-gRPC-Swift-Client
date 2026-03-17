@@ -61,7 +61,8 @@ public class DrawThingsClient: ObservableObject {
             negativePrompt: negativePrompt,
             configuration: configuration,
             image: image,
-            mask: mask
+            mask: mask,
+            hints: hints
         )
         return try resultData.map { try ImageHelpers.dtTensorToImage($0) }
     }
@@ -98,6 +99,7 @@ public class DrawThingsClient: ObservableObject {
         configuration: DrawThingsConfiguration,
         image: PlatformImage?,
         mask: PlatformImage?,
+        hints: [HintProto] = [],
         audioHandler: @escaping (Data) async -> Void = { _ in }
     ) async throws -> [Data] {
         currentProgress = ImageGenerationProgress()

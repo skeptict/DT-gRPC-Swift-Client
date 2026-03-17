@@ -470,9 +470,10 @@ public struct ImageHelpers {
 
         let compressionFlag = header[0]
         let format = header[2]  // 0x02 = NHWC, other = NCHW
-        let height = Int(header[6])
+        var height = Int(header[6])
         let width = Int(header[7])
         let channels = Int(header[8])
+        let dim0 = Int(header[5])
         let isNHWC = (format == 0x02)
 
         if compressionFlag == 1012247 {
