@@ -93,6 +93,7 @@ public actor DrawThingsService {
         contents: [Data] = [],
         override: MetadataOverride? = nil,
         scaleFactor: Int32 = 1,
+        sharedSecret: String? = nil,
         progressHandler: @escaping (ImageGenerationSignpostProto?) async -> Void = { _ in },
         previewHandler: @escaping (Data) async -> Void = { _ in },
         audioHandler: @escaping (Data) async -> Void = { _ in }
@@ -139,6 +140,10 @@ public actor DrawThingsService {
                 $0.override = override
             } else if let cachedModels = self.models {
                 $0.override = cachedModels
+            }
+
+            if let sharedSecret = sharedSecret {
+                $0.sharedSecret = sharedSecret
             }
 
             $0.chunked = true

@@ -54,7 +54,8 @@ public class DrawThingsClient: ObservableObject {
         configuration: DrawThingsConfiguration = DrawThingsConfiguration(),
         image: PlatformImage? = nil,
         mask: PlatformImage? = nil,
-        hints: [HintProto] = []
+        hints: [HintProto] = [],
+        sharedSecret: String? = nil
     ) async throws -> [PlatformImage] {
         let resultData = try await callService(
             prompt: prompt,
@@ -62,7 +63,8 @@ public class DrawThingsClient: ObservableObject {
             configuration: configuration,
             image: image,
             mask: mask,
-            hints: hints
+            hints: hints,
+            sharedSecret: sharedSecret
         )
         return try resultData.map { try ImageHelpers.dtTensorToImage($0) }
     }
@@ -72,7 +74,8 @@ public class DrawThingsClient: ObservableObject {
         negativePrompt: String = "",
         configuration: DrawThingsConfiguration = DrawThingsConfiguration(),
         image: PlatformImage? = nil,
-        mask: PlatformImage? = nil
+        mask: PlatformImage? = nil,
+        sharedSecret: String? = nil
     ) async throws -> GenerationOutput {
         var audioBuffers: [AVAudioPCMBuffer] = []
 
@@ -82,6 +85,7 @@ public class DrawThingsClient: ObservableObject {
             configuration: configuration,
             image: image,
             mask: mask,
+            sharedSecret: sharedSecret,
             audioHandler: { audioData in
                 if let buffer = try? AudioHelpers.ccvTensorToAudioBuffer(audioData) {
                     audioBuffers.append(buffer)
@@ -100,6 +104,7 @@ public class DrawThingsClient: ObservableObject {
         image: PlatformImage?,
         mask: PlatformImage?,
         hints: [HintProto] = [],
+        sharedSecret: String? = nil,
         audioHandler: @escaping (Data) async -> Void = { _ in }
     ) async throws -> [Data] {
         currentProgress = ImageGenerationProgress()
@@ -124,6 +129,7 @@ public class DrawThingsClient: ObservableObject {
             image: imageData,
             mask: maskData,
             hints: hints,
+            sharedSecret: sharedSecret,
             progressHandler: { [weak self] signpost in
                 await MainActor.run {
                     self?.updateProgress(signpost)

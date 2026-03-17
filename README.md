@@ -38,6 +38,8 @@ The following features have been tested and confirmed working:
 
 The following features are available in the protocol but have not yet been tested:
 - **File Upload**: Uploading models or other files to the server
+- **Share Secret**: Functionality is now added to the generation requests but has not been tested
+- **Audio**: Audio functionality (for LTX-2) is implemented but not tested
 
 Contributions and testing reports for these features are welcome!
 
@@ -60,8 +62,8 @@ To use this framework, you need to configure the Draw Things gRPC server with th
    - This allows the framework to query available models, samplers, and other metadata
    - Required for proper initialization and model selection
    
-3. **Share Secret**: Must be **disabled**
-    - The shared secret is not implemented in the client
+3. **Share Secret**: May be **enabled** or **disabled**
+    - The shared secret is implemented in the client but the application must also support passing that optional paramter with the generation request.
 
 ## Important: Image Data Formats
 
