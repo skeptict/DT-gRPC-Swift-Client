@@ -82,8 +82,8 @@ Draw Things uses a custom tensor format (DTTensor) for image data exchange, **no
 ### DTTensor Format
 
 The DTTensor format consists of:
-- **68-byte header** containing dimensions, channel count, and compression flag
-- **Float16 RGB pixel data** with values in range [-1, 1]
+- **68-byte header** containing dimensions, channel count, and compression identifier
+- **Float16 RGB pixel data** with values in range [-1, 1] (raw or compressed with deflate/fpzip)
 
 The `ImageHelpers` class provides conversion utilities:
 
@@ -249,14 +249,13 @@ This library provides two API levels:
 
 | API | Class | Use Case |
 |-----|-------|----------|
-| **High-level** | `DrawThingsClient` | Simple integration, handles DTTensor conversion automatically, returns `[NSImage]` |
-| **Low-level** | `DrawThingsService` | Full control, requires manual DTTensor conversion, supports hints/controls, returns `[Data]` |
+| **High-level** | `DrawThingsClient` | Simple integration, handles DTTensor conversion automatically, supports hints/moodboard, returns `[PlatformImage]` |
+| **Low-level** | `DrawThingsService` | Full control, requires manual DTTensor conversion, supports all parameters including preview callbacks, returns `[Data]` |
 
 For most use cases, start with `DrawThingsClient`. Use `DrawThingsService` when you need:
-- Hints/moodboard images
-- ControlNet support
 - Progress callbacks with preview images
 - Custom handling of raw tensor data
+- Access to all generation parameters (contents, override, scaleFactor)
 
 ### Basic Usage
 
@@ -335,6 +334,26 @@ let config = DrawThingsConfiguration(
 ```
 See ./Examples/Config from JSON.swift within this project for usable functions which populate a DrawThingsConfiguration from a Draw Things JSON configuration passed in a String value.
 
+### Shared Secret Authentication
+
+If the Draw Things server requires a shared secret, pass it with the generation request:
+
+```swift
+// High-level API
+let images = try await client.generateImage(
+    prompt: "A beautiful landscape",
+    configuration: config,
+    sharedSecret: "my-secret-key"
+)
+
+// Low-level API
+let resultData = try await service.generateImage(
+    prompt: "A beautiful landscape",
+    configuration: configData,
+    sharedSecret: "my-secret-key"
+)
+```
+
 ### Image-to-Image Generation
 
 Using the high-level `DrawThingsClient` API (handles DTTensor conversion automatically):
@@ -353,7 +372,7 @@ Using the lower-level `DrawThingsService` API (requires manual DTTensor conversi
 
 ```swift
 let inputImage = NSImage(named: "input.jpg")!
-let imageData = try ImageHelpers.nsImageToDTTensor(inputImage, forceRGB: true)
+let imageData = try ImageHelpers.imageToDTTensor(inputImage, forceRGB: true)
 let configData = try config.toFlatBufferData()
 
 let resultData = try await service.generateImage(
@@ -363,7 +382,7 @@ let resultData = try await service.generateImage(
 )
 
 // Convert results back to NSImage
-let images = try resultData.map { try ImageHelpers.dtTensorToNSImage($0) }
+let images = try resultData.map { try ImageHelpers.dtTensorToImage($0) }
 ```
 
 ### Inpainting with Mask
@@ -388,8 +407,8 @@ Using the lower-level `DrawThingsService` API:
 let inputImage = NSImage(named: "photo.jpg")!
 let maskImage = NSImage(named: "mask.png")!
 
-let imageData = try ImageHelpers.nsImageToDTTensor(inputImage, forceRGB: true)
-let maskData = try ImageHelpers.nsImageToDTTensor(maskImage, forceRGB: true)
+let imageData = try ImageHelpers.imageToDTTensor(inputImage, forceRGB: true)
+let maskData = try ImageHelpers.imageToDTTensor(maskImage, forceRGB: true)
 let configData = try config.toFlatBufferData()
 
 let resultData = try await service.generateImage(
@@ -399,17 +418,17 @@ let resultData = try await service.generateImage(
     mask: maskData
 )
 
-let images = try resultData.map { try ImageHelpers.dtTensorToNSImage($0) }
+let images = try resultData.map { try ImageHelpers.dtTensorToImage($0) }
 ```
 
 ### Moodboard / Reference Images
 
-Use moodboard (also known as "shuffle") to provide reference images that influence the generation. This is particularly useful with models like Qwen Image Edit:
+Use moodboard (also known as "shuffle") to provide reference images that influence the generation. This is particularly useful with models like Qwen Image Edit. Both `DrawThingsClient` and `DrawThingsService` support hints:
 
 ```swift
 // Single reference image
 let referenceImage = NSImage(named: "style_reference.jpg")!
-let referenceData = try ImageHelpers.nsImageToDTTensor(referenceImage, forceRGB: true)
+let referenceData = try ImageHelpers.imageToDTTensor(referenceImage, forceRGB: true)
 
 var tensorAndWeight = TensorAndWeight()
 tensorAndWeight.tensor = referenceData
@@ -419,7 +438,15 @@ var hint = HintProto()
 hint.hintType = "shuffle"  // Use "shuffle" for moodboard/reference images
 hint.tensors = [tensorAndWeight]
 
-let images = try await service.generateImage(
+// Using DrawThingsClient (high-level)
+let images = try await client.generateImage(
+    prompt: "A woman wearing a blue dress",
+    configuration: config,
+    hints: [hint]
+)
+
+// Using DrawThingsService (low-level)
+let resultData = try await service.generateImage(
     prompt: "A woman wearing a blue dress",
     negativePrompt: "",
     configuration: configData,
@@ -440,7 +467,7 @@ let referenceImages = [
 ]
 
 for refImage in referenceImages {
-    let imageData = try ImageHelpers.nsImageToDTTensor(refImage, forceRGB: true)
+    let imageData = try ImageHelpers.imageToDTTensor(refImage, forceRGB: true)
 
     var tensorAndWeight = TensorAndWeight()
     tensorAndWeight.tensor = imageData
@@ -488,7 +515,7 @@ let config = DrawThingsConfiguration(
 
 // Prepare the control image (e.g., a face for PuLID)
 let controlImage = NSImage(named: "reference_face.jpg")!
-let controlImageData = try ImageHelpers.nsImageToDTTensor(controlImage, forceRGB: true)
+let controlImageData = try ImageHelpers.imageToDTTensor(controlImage, forceRGB: true)
 
 var tensorAndWeight = TensorAndWeight()
 tensorAndWeight.tensor = controlImageData
@@ -702,9 +729,11 @@ For backward compatibility, the following deprecated methods are still available
 
 DrawThingsClient is built on top of:
 
-- **gRPC Swift 2**: Modern gRPC client with async/await support
+- **gRPC Swift**: Modern gRPC client with async/await support
 - **SwiftProtobuf**: Type-safe protocol buffer implementation
 - **SwiftNIO**: High-performance networking
+- **FlatBuffers**: Configuration serialization
+- **fpzip**: Floating-point tensor decompression (via swift-fpzip-support)
 
 The framework provides two main interfaces:
 
@@ -750,15 +779,16 @@ swift run
 
 - `init(address: String, useTLS: Bool = true)`: Create a new client
 - `connect() async`: Connect to the Draw Things server
-- `generateImage(...)` async: Generate images with progress tracking
+- `generateImage(prompt:negativePrompt:configuration:image:mask:hints:sharedSecret:) async throws -> [PlatformImage]`: Generate images with progress tracking
+- `generateImageAndAudio(prompt:negativePrompt:configuration:image:mask:sharedSecret:) async throws -> GenerationOutput`: Generate images and audio (LTX-2)
 - `@Published var isConnected`: Connection status
 - `@Published var currentProgress`: Current generation progress
 
 ### DrawThingsService (Low-level)
 
 - `echo(name:) async throws -> EchoReply`: Server health check
-- `generateImage(...) async throws -> [Data]`: Generate images
-- `checkFilesExist(...) async throws -> FileExistenceResponse`: Check file existence
+- `generateImage(prompt:negativePrompt:configuration:image:mask:hints:contents:override:scaleFactor:sharedSecret:progressHandler:previewHandler:audioHandler:) async throws -> [Data]`: Generate images with full control
+- `checkFilesExist(files:filesWithHash:) async throws -> FileExistenceResponse`: Check file existence
 
 ### Configuration
 
