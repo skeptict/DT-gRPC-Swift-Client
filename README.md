@@ -33,12 +33,15 @@ The following features have been tested and confirmed working:
 - **Model Metadata**: Query available models and samplers
 - **Multi-stage Models**: Stage 2 parameters for multi-stage generation pipelines
 - **Advanced Optimization**: TEA Cache and other performance optimizations
+- **Shared Secret**: API support for using a shared secret with your gRPC server connection
+- **Response Compression**: The library can receive compressed responses from the gRPC server
 
 ### ⚠️ Untested Features
 
 The following features are available in the protocol but have not yet been tested:
 - **File Upload**: Uploading models or other files to the server
-- **Share Secret**: Functionality is now added to the generation requests but has not been tested
+
+The following features are at least partially implemented in the API but have not yet been tested:
 - **Audio**: Audio functionality (for LTX-2) is implemented but not tested
 
 Contributions and testing reports for these features are welcome!
@@ -55,12 +58,19 @@ Contributions and testing reports for these features are welcome!
 
 To use this framework, you need to configure the Draw Things gRPC server with the following settings:
 
-1. **Response Compression**: Must be **disabled**
-   - Having server-side compression enabled will cause failure, the client does not currently have the ability to decompress responses
+1. **Response Compression**: May be **enabled** or **disabled**
+   - Having server-side compression enabled is supported, the client has the ability to decompress the responses
+   
+2. **Transport Layer Security**: May be **enabled** or **disabled**
+   - Either mode is supported, enabling TLS is recommended
+   
+3. **Bridge Mode**: May be **enabled** or **disabled**
+   - Generation pass through to another server, including DT+ is supported
+   - Bring Your Own LoRA (BYOL) feature of DT+ is not supported in Bridge Mode currently. This is a DT+ service limitation, not a limitation of the DrawThingsClient
 
 2. **Enable Model Browsing**: Recommended to be **enabled**
-   - This allows the framework to query available models, samplers, and other metadata
-   - Required for proper initialization and model selection
+   - This allows the framework to query available checkpoint models, controlnets, LoRAs, etc.
+   - Required for proper initialization and model selection in a UI
    
 3. **Share Secret**: May be **enabled** or **disabled**
     - The shared secret is implemented in the client but the application must also support passing that optional paramter with the generation request.
