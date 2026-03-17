@@ -479,6 +479,18 @@ public struct ImageHelpers {
             throw ImageError.compressionNotSupported
         }
 
+        // For LTX-2 preview latents, strip audio latent rows from the bottom
+        let family = modelFamily ?? .unknown
+        if family == .ltx2 && dim0 > 0 && width > 0 {
+            let (_, audioHeight) = ltx2ExtractAudioFramesAndHeight(
+                dim0: dim0, height: height, width: width
+            )
+            if audioHeight > 0 && audioHeight < height {
+                DrawThingsClientLogger.debug("dtTensorToImage: stripping \(audioHeight) audio latent rows from LTX-2 preview (height \(height) -> \(height - audioHeight))")
+                height -= audioHeight
+            }
+        }
+
         guard channels == 3 || channels == 4 || channels == 16 || channels == 32 || channels == 48 else {
             DrawThingsClientLogger.error("dtTensorToImage: unsupported channel count \(channels)")
             throw ImageError.conversionFailed
@@ -555,6 +567,21 @@ public struct ImageHelpers {
 
         // Create platform image from RGB data
         return try createImageFromRGBData(rgbData, width: width, height: height)
+    }
+
+    // MARK: - LTX-2 Audio Latent Stripping
+
+    /// Compute the number of audio frames and audio latent height for LTX-2 tensors.
+    ///
+    /// Ports the upstream `LTX2ExtractAudioFramesAndHeight` function.
+    /// Audio latent rows are appended at the bottom of the video latent tensor
+    /// and must be stripped before preview conversion.
+    private static func ltx2ExtractAudioFramesAndHeight(
+        dim0: Int, height: Int, width: Int
+    ) -> (audioFrames: Int, audioHeight: Int) {
+        let audioFrames = (dim0 - 1) * 8 + 1
+        let audioHeight = (audioFrames + width * dim0 - 1) / (width * dim0)
+        return (audioFrames, audioHeight)
     }
 
     // MARK: - Model-Specific Latent Conversion Functions

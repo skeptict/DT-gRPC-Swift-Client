@@ -59,6 +59,40 @@ public enum DeviceType: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
+public enum ChunkState: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case lastChunk // = 0
+  case moreChunks // = 1
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .lastChunk
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .lastChunk
+    case 1: self = .moreChunks
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .lastChunk: return 0
+    case .moreChunks: return 1
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [ChunkState] = [
+    .lastChunk,
+    .moreChunks,
+  ]
+
+}
+
 public struct EchoRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -271,6 +305,12 @@ public struct ImageGenerationRequest: @unchecked Sendable {
   public var hasSharedSecret: Bool {return _storage._sharedSecret != nil}
   /// Clears the value of `sharedSecret`. Subsequent reads from it will return its default value.
   public mutating func clearSharedSecret() {_uniqueStorage()._sharedSecret = nil}
+
+  /// Whether the client supports chunked responses.
+  public var chunked: Bool {
+    get {return _storage._chunked}
+    set {_uniqueStorage()._chunked = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -557,6 +597,12 @@ public struct ImageGenerationResponse: Sendable {
   /// Clears the value of `downloadSize`. Subsequent reads from it will return its default value.
   public mutating func clearDownloadSize() {self._downloadSize = nil}
 
+  /// Whether this is the last chunk or more chunks follow.
+  public var chunkState: ChunkState = .lastChunk
+
+  /// Generated audio data as bytes.
+  public var generatedAudio: [Data] = []
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -675,6 +721,10 @@ public struct FileUploadRequest: Sendable {
 
 extension DeviceType: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PHONE\0\u{1}TABLET\0\u{1}LAPTOP\0")
+}
+
+extension ChunkState: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0LAST_CHUNK\0\u{1}MORE_CHUNKS\0")
 }
 
 extension EchoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -901,7 +951,7 @@ extension MetadataOverride: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
 
 extension ImageGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = "ImageGenerationRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}image\0\u{1}scaleFactor\0\u{1}mask\0\u{1}hints\0\u{1}prompt\0\u{1}negativePrompt\0\u{1}configuration\0\u{1}override\0\u{1}keywords\0\u{1}user\0\u{1}device\0\u{1}contents\0\u{1}sharedSecret\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}image\0\u{1}scaleFactor\0\u{1}mask\0\u{1}hints\0\u{1}prompt\0\u{1}negativePrompt\0\u{1}configuration\0\u{1}override\0\u{1}keywords\0\u{1}user\0\u{1}device\0\u{1}contents\0\u{1}sharedSecret\0\u{1}chunked\0")
 
   fileprivate class _StorageClass {
     public var _image: Data? = nil
@@ -917,6 +967,7 @@ extension ImageGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     public var _device: DeviceType = .phone
     public var _contents: [Data] = []
     public var _sharedSecret: String? = nil
+    public var _chunked: Bool = false
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -940,6 +991,7 @@ extension ImageGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       _device = source._device
       _contents = source._contents
       _sharedSecret = source._sharedSecret
+      _chunked = source._chunked
     }
   }
 
@@ -971,6 +1023,7 @@ extension ImageGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
         case 11: try { try decoder.decodeSingularEnumField(value: &_storage._device) }()
         case 12: try { try decoder.decodeRepeatedBytesField(value: &_storage._contents) }()
         case 13: try { try decoder.decodeSingularStringField(value: &_storage._sharedSecret) }()
+        case 14: try { try decoder.decodeSingularBoolField(value: &_storage._chunked) }()
         default: break
         }
       }
@@ -1022,6 +1075,9 @@ extension ImageGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       try { if let v = _storage._sharedSecret {
         try visitor.visitSingularStringField(value: v, fieldNumber: 13)
       } }()
+      if _storage._chunked != false {
+        try visitor.visitSingularBoolField(value: _storage._chunked, fieldNumber: 14)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1044,6 +1100,7 @@ extension ImageGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
         if _storage._device != rhs_storage._device {return false}
         if _storage._contents != rhs_storage._contents {return false}
         if _storage._sharedSecret != rhs_storage._sharedSecret {return false}
+        if _storage._chunked != rhs_storage._chunked {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1504,7 +1561,7 @@ extension ImageGenerationSignpostProto.ImageUpscaled: SwiftProtobuf.Message, Swi
 
 extension ImageGenerationResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = "ImageGenerationResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}generatedImages\0\u{1}currentSignpost\0\u{1}signposts\0\u{1}previewImage\0\u{1}scaleFactor\0\u{1}tags\0\u{1}downloadSize\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}generatedImages\0\u{1}currentSignpost\0\u{1}signposts\0\u{1}previewImage\0\u{1}scaleFactor\0\u{1}tags\0\u{1}downloadSize\0\u{1}chunkState\0\0\u{1}generatedAudio\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1519,6 +1576,8 @@ extension ImageGenerationResponse: SwiftProtobuf.Message, SwiftProtobuf._Message
       case 5: try { try decoder.decodeSingularInt32Field(value: &self._scaleFactor) }()
       case 6: try { try decoder.decodeRepeatedStringField(value: &self.tags) }()
       case 7: try { try decoder.decodeSingularInt64Field(value: &self._downloadSize) }()
+      case 8: try { try decoder.decodeSingularEnumField(value: &self.chunkState) }()
+      case 10: try { try decoder.decodeRepeatedBytesField(value: &self.generatedAudio) }()
       default: break
       }
     }
@@ -1550,6 +1609,12 @@ extension ImageGenerationResponse: SwiftProtobuf.Message, SwiftProtobuf._Message
     try { if let v = self._downloadSize {
       try visitor.visitSingularInt64Field(value: v, fieldNumber: 7)
     } }()
+    if self.chunkState != .lastChunk {
+      try visitor.visitSingularEnumField(value: self.chunkState, fieldNumber: 8)
+    }
+    if !self.generatedAudio.isEmpty {
+      try visitor.visitRepeatedBytesField(value: self.generatedAudio, fieldNumber: 10)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1561,6 +1626,8 @@ extension ImageGenerationResponse: SwiftProtobuf.Message, SwiftProtobuf._Message
     if lhs._scaleFactor != rhs._scaleFactor {return false}
     if lhs.tags != rhs.tags {return false}
     if lhs._downloadSize != rhs._downloadSize {return false}
+    if lhs.chunkState != rhs.chunkState {return false}
+    if lhs.generatedAudio != rhs.generatedAudio {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

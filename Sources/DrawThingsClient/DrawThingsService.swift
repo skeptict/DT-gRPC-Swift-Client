@@ -94,7 +94,8 @@ public actor DrawThingsService {
         override: MetadataOverride? = nil,
         scaleFactor: Int32 = 1,
         progressHandler: @escaping (ImageGenerationSignpostProto?) async -> Void = { _ in },
-        previewHandler: @escaping (Data) async -> Void = { _ in }
+        previewHandler: @escaping (Data) async -> Void = { _ in },
+        audioHandler: @escaping (Data) async -> Void = { _ in }
     ) async throws -> [Data] {
         
         // Ensure we have models metadata
@@ -139,10 +140,14 @@ public actor DrawThingsService {
             } else if let cachedModels = self.models {
                 $0.override = cachedModels
             }
+
+            $0.chunked = true
         }
         
         return try await withCheckedThrowingContinuation { continuation in
             var generatedImages: [Data] = []
+            var lastImageChunk = Data()
+            var lastAudioChunk = Data()
             var lastPreviewImage: Data?
             var expectedDownloadSize: Int64?
             var hasResumed = false
@@ -152,6 +157,8 @@ public actor DrawThingsService {
                 responseCount += 1
                 DrawThingsClientLogger.debug("Response #\(responseCount) received:")
                 DrawThingsClientLogger.debug("   - generatedImages.count: \(response.generatedImages.count)")
+                DrawThingsClientLogger.debug("   - generatedAudio.count: \(response.generatedAudio.count)")
+                DrawThingsClientLogger.debug("   - chunkState: \(response.chunkState)")
                 DrawThingsClientLogger.debug("   - hasCurrentSignpost: \(response.hasCurrentSignpost)")
                 DrawThingsClientLogger.debug("   - hasDownloadSize: \(response.hasDownloadSize)")
                 DrawThingsClientLogger.debug("   - hasPreviewImage: \(response.hasPreviewImage)")
@@ -202,18 +209,47 @@ public actor DrawThingsService {
                     }
                 }
 
-                // Collect generated images (if server sends them directly)
+                // Collect generated images with chunk reassembly
                 if !response.generatedImages.isEmpty {
-                    DrawThingsClientLogger.debug("Received \(response.generatedImages.count) image(s):")
-                    for (idx, img) in response.generatedImages.enumerated() {
-                        DrawThingsClientLogger.debug("   - Image \(idx): \(img.count) bytes")
+                    var images = response.generatedImages
+                    if response.chunkState == .lastChunk {
+                        if !lastImageChunk.isEmpty {
+                            images[0] = lastImageChunk + images[0]
+                            lastImageChunk = Data()
+                        }
+                        DrawThingsClientLogger.debug("Received \(images.count) image(s) (final chunk):")
+                        for (idx, img) in images.enumerated() {
+                            DrawThingsClientLogger.debug("   - Image \(idx): \(img.count) bytes")
+                        }
+                        generatedImages.append(contentsOf: images)
+                    } else {
+                        // More chunks coming — accumulate
+                        for img in images {
+                            lastImageChunk.append(img)
+                        }
+                        DrawThingsClientLogger.debug("Accumulated image chunk: \(lastImageChunk.count) bytes so far")
                     }
-                    generatedImages.append(contentsOf: response.generatedImages)
+                }
 
-                    let totalReceived = generatedImages.reduce(0) { $0 + $1.count }
-                    DrawThingsClientLogger.debug("Total image data received so far: \(totalReceived) bytes")
-                    if let expectedSize = expectedDownloadSize, totalReceived >= expectedSize {
-                        DrawThingsClientLogger.debug("Received all expected data (\(totalReceived) bytes)")
+                // Deliver generated audio with chunk reassembly via callback
+                if !response.generatedAudio.isEmpty {
+                    var audio = response.generatedAudio
+                    if response.chunkState == .lastChunk {
+                        if !lastAudioChunk.isEmpty {
+                            audio[0] = lastAudioChunk + audio[0]
+                            lastAudioChunk = Data()
+                        }
+                        DrawThingsClientLogger.debug("Received \(audio.count) audio tensor(s) (final chunk)")
+                        for audioData in audio {
+                            Task {
+                                await audioHandler(audioData)
+                            }
+                        }
+                    } else {
+                        for a in audio {
+                            lastAudioChunk.append(a)
+                        }
+                        DrawThingsClientLogger.debug("Accumulated audio chunk: \(lastAudioChunk.count) bytes so far")
                     }
                 }
             }

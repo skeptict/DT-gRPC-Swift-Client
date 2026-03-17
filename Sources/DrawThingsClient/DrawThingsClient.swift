@@ -9,6 +9,7 @@
 //  See LICENSE file in the project root for license information.
 //
 
+import AVFoundation
 import Foundation
 import SwiftUI
 import Combine
@@ -18,6 +19,11 @@ import AppKit
 #else
 import UIKit
 #endif
+
+public struct GenerationOutput: Sendable {
+    public let images: [PlatformImage]
+    public let audio: [AVAudioPCMBuffer]
+}
 
 @MainActor
 public class DrawThingsClient: ObservableObject {
@@ -50,7 +56,50 @@ public class DrawThingsClient: ObservableObject {
         mask: PlatformImage? = nil,
         hints: [HintProto] = []
     ) async throws -> [PlatformImage] {
+        let resultData = try await callService(
+            prompt: prompt,
+            negativePrompt: negativePrompt,
+            configuration: configuration,
+            image: image,
+            mask: mask
+        )
+        return try resultData.map { try ImageHelpers.dtTensorToImage($0) }
+    }
 
+    public func generateImageAndAudio(
+        prompt: String,
+        negativePrompt: String = "",
+        configuration: DrawThingsConfiguration = DrawThingsConfiguration(),
+        image: PlatformImage? = nil,
+        mask: PlatformImage? = nil
+    ) async throws -> GenerationOutput {
+        var audioBuffers: [AVAudioPCMBuffer] = []
+
+        let resultData = try await callService(
+            prompt: prompt,
+            negativePrompt: negativePrompt,
+            configuration: configuration,
+            image: image,
+            mask: mask,
+            audioHandler: { audioData in
+                if let buffer = try? AudioHelpers.ccvTensorToAudioBuffer(audioData) {
+                    audioBuffers.append(buffer)
+                }
+            }
+        )
+
+        let images = try resultData.map { try ImageHelpers.dtTensorToImage($0) }
+        return GenerationOutput(images: images, audio: audioBuffers)
+    }
+
+    private func callService(
+        prompt: String,
+        negativePrompt: String,
+        configuration: DrawThingsConfiguration,
+        image: PlatformImage?,
+        mask: PlatformImage?,
+        audioHandler: @escaping (Data) async -> Void = { _ in }
+    ) async throws -> [Data] {
         currentProgress = ImageGenerationProgress()
 
         let configData = try configuration.toFlatBufferData()
@@ -58,7 +107,6 @@ public class DrawThingsClient: ObservableObject {
         var imageData: Data?
         var maskData: Data?
 
-        // Convert images to DTTensor format (required by Draw Things server)
         if let image = image {
             imageData = try ImageHelpers.imageToDTTensor(image, forceRGB: true)
         }
@@ -67,7 +115,7 @@ public class DrawThingsClient: ObservableObject {
             maskData = try ImageHelpers.imageToDTTensor(mask, forceRGB: true)
         }
 
-        let resultData = try await service.generateImage(
+        let result = try await service.generateImage(
             prompt: prompt,
             negativePrompt: negativePrompt,
             configuration: configData,
@@ -78,13 +126,12 @@ public class DrawThingsClient: ObservableObject {
                 await MainActor.run {
                     self?.updateProgress(signpost)
                 }
-            }
+            },
+            audioHandler: audioHandler
         )
 
         currentProgress = nil
-
-        // Convert DTTensor results back to PlatformImage
-        return try resultData.map { try ImageHelpers.dtTensorToImage($0) }
+        return result
     }
     
     private func updateProgress(_ signpost: ImageGenerationSignpostProto?) {
