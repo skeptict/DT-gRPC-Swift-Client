@@ -13,6 +13,7 @@ A Swift client library for interacting with Draw Things gRPC server, designed fo
 - **Progress Tracking**: Real-time progress updates during image generation
 - **Image Utilities**: Built-in helpers for image conversion and manipulation
 - **Type Safety**: Full Swift type safety with generated protobuf code
+- **Legacy Processor Support**: Library runs on both Intel and Apple Silicon processors
 
 ## Feature Status
 
