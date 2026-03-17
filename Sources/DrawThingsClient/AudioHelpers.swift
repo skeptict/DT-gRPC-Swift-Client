@@ -16,7 +16,6 @@ public struct AudioHelpers {
 
     public enum AudioError: Error, CustomStringConvertible {
         case invalidData
-        case compressionNotSupported
         case unsupportedDataType(UInt32)
         case bufferCreationFailed
         case fileWriteFailed
@@ -25,8 +24,6 @@ public struct AudioHelpers {
             switch self {
             case .invalidData:
                 return "Audio tensor data is too small or has an invalid header"
-            case .compressionNotSupported:
-                return "Compressed audio tensors (fpzip) are not supported. Full s4nnc decompression is required."
             case .unsupportedDataType(let type):
                 return "Unsupported tensor data type: 0x\(String(type, radix: 16)). Expected CCV_32F (0x4000)."
             case .bufferCreationFailed:
@@ -45,8 +42,6 @@ public struct AudioHelpers {
     private static let CCV_TENSOR_FORMAT_NCHW: UInt32 = 0x01
     private static let CCV_TENSOR_FORMAT_NHWC: UInt32 = 0x02
 
-    // Compression marker
-    private static let COMPRESSION_MARKER: UInt32 = 1012247
 
     /// Convert a CCV tensor (raw Float32 waveform) to an AVAudioPCMBuffer.
     ///
@@ -62,6 +57,9 @@ public struct AudioHelpers {
             throw AudioError.invalidData
         }
 
+        // Decompress if needed (handles deflate and fpzip compression)
+        let data = try TensorDecompression.decompressIfNeeded(data)
+
         // Read 68-byte CCV tensor header (17 x UInt32)
         var header = [UInt32](repeating: 0, count: 17)
         data.prefix(68).withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
@@ -71,17 +69,11 @@ public struct AudioHelpers {
             }
         }
 
-        let compressionFlag = header[0]
         let formatFlag = header[2]
         let dataType = header[3]
         let height = Int(header[6])  // num_samples
         let width = Int(header[7])   // typically 1 for audio
         let channels = Int(header[8])
-
-        // Check for compression
-        if compressionFlag == COMPRESSION_MARKER {
-            throw AudioError.compressionNotSupported
-        }
 
         // Validate data type is Float32
         guard dataType == CCV_32F else {

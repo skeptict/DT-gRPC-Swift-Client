@@ -158,7 +158,14 @@ public actor DrawThingsService {
             var hasResumed = false
             var responseCount = 0
 
-            let call = client.generateImage(request) { response in
+            // Configure call options to accept compressed responses
+            var callOptions = CallOptions()
+            callOptions.messageEncoding = .enabled(.init(
+                forRequests: nil,
+                decompressionLimit: .absolute(.max)
+            ))
+
+            let call = client.generateImage(request, callOptions: callOptions) { response in
                 responseCount += 1
                 DrawThingsClientLogger.debug("Response #\(responseCount) received:")
                 DrawThingsClientLogger.debug("   - generatedImages.count: \(response.generatedImages.count)")

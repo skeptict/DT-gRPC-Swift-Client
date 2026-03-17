@@ -82,6 +82,14 @@
       }
     },
     {
+      "identity" : "swift-fpzip-support",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/weiyanlin117/swift-fpzip-support.git",
+      "state" : {
+        "revision" : "0ec6d4668c9c83bc3da0f8b2d6dfc46da0b98609"
+      }
+    },
+    {
       "identity" : "swift-http-structured-headers",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-http-structured-headers.git",

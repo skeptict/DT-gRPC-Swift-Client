@@ -459,6 +459,9 @@ public struct ImageHelpers {
             throw ImageError.invalidData
         }
 
+        // Decompress if needed (handles deflate and fpzip compression)
+        let tensorData = try TensorDecompression.decompressIfNeeded(tensorData)
+
         // Read header
         var header = [UInt32](repeating: 0, count: 17)
         tensorData.prefix(68).withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
@@ -468,17 +471,12 @@ public struct ImageHelpers {
             }
         }
 
-        let compressionFlag = header[0]
         let format = header[2]  // 0x02 = NHWC, other = NCHW
         var height = Int(header[6])
         let width = Int(header[7])
         let channels = Int(header[8])
         let dim0 = Int(header[5])
         let isNHWC = (format == 0x02)
-
-        if compressionFlag == 1012247 {
-            throw ImageError.compressionNotSupported
-        }
 
         // For LTX-2 preview latents, strip audio latent rows from the bottom
         let family = modelFamily ?? .unknown
@@ -1325,7 +1323,6 @@ public enum ImageError: Error, LocalizedError {
     case invalidData
     case conversionFailed
     case fileNotFound
-    case compressionNotSupported
 
     public var errorDescription: String? {
         switch self {
@@ -1337,8 +1334,6 @@ public enum ImageError: Error, LocalizedError {
             return "Failed to convert image to desired format"
         case .fileNotFound:
             return "Image file not found"
-        case .compressionNotSupported:
-            return "Compressed image format not yet supported. Please disable compression in Draw Things server settings."
         }
     }
 }
