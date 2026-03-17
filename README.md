@@ -31,13 +31,12 @@ The following features have been tested and confirmed working:
 - **Progress Tracking**: Real-time generation progress updates
 - **Preview Images**: Receive preview images during generation
 - **Model Metadata**: Query available models and samplers
+- **Multi-stage Models**: Stage 2 parameters for multi-stage generation pipelines
+- **Advanced Optimization**: TEA Cache and other performance optimizations
 
 ### ⚠️ Untested Features
 
 The following features are available in the protocol but have not yet been tested:
-
-- **Multi-stage Models**: Stage 2 parameters for multi-stage generation pipelines
-- **Advanced Optimization**: TEA Cache and other performance optimizations
 - **File Upload**: Uploading models or other files to the server
 
 Contributions and testing reports for these features are welcome!
@@ -55,11 +54,14 @@ Contributions and testing reports for these features are welcome!
 To use this framework, you need to configure the Draw Things gRPC server with the following settings:
 
 1. **Response Compression**: Must be **disabled**
-   - Having server-side compression enabled will cause failure, the framework does not currently have the ability to decompress responses
+   - Having server-side compression enabled will cause failure, the client does not currently have the ability to decompress responses
 
 2. **Enable Model Browsing**: Recommended to be **enabled**
    - This allows the framework to query available models, samplers, and other metadata
    - Required for proper initialization and model selection
+   
+3. **Share Secret**: Must be **disabled**
+    - The shared secret is not implemented in the client
 
 ## Important: Image Data Formats
 
@@ -223,7 +225,7 @@ Or add it to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/euphoriacyberware-ai/DT-gRPC-Swift-Client", from: "1.0.0")
+    .package(url: "https://github.com/euphoriacyberware-ai/DT-gRPC-Swift-Client", from: "1.2.5")
 ]
 ```
 
