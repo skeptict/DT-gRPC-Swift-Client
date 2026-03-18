@@ -490,7 +490,7 @@ let images = try await service.generateImage(
 )
 ```
 
-**Note:** The moodboard feature works best with models that are designed to use reference images.
+**Note:** The moodboard feature works best with models that are designed to use reference images. See also the [HintBuilder](#hintbuilder) section below for a simpler way to construct hints.
 
 ### ControlNet
 
@@ -553,6 +553,71 @@ let images = try await service.generateImage(
 - **Canny**: Edge-based control
 - **Pose**: Human pose control (OpenPose)
 - **Scribble**: Sketch-based control
+
+### HintBuilder
+
+The `HintBuilder` class provides a convenient fluent API for constructing hints without manually creating `HintProto` and `TensorAndWeight` objects. It accepts raw image data (PNG/JPEG) and handles DTTensor conversion automatically.
+
+```swift
+// Single moodboard image
+let imageData = try Data(contentsOf: imageURL)
+let hints = HintBuilder()
+    .addMoodboardImage(imageData, weight: 1.0)
+    .build()
+
+let images = try await client.generateImage(
+    prompt: "A woman wearing a blue dress",
+    configuration: config,
+    hints: hints
+)
+```
+
+Multiple images and different hint types can be combined:
+
+```swift
+let refData = try Data(contentsOf: referenceURL)
+let depthData = try Data(contentsOf: depthMapURL)
+let edgeData = try Data(contentsOf: cannyURL)
+
+let hints = HintBuilder()
+    .addMoodboardImage(refData)
+    .addDepthMap(depthData, weight: 0.8)
+    .addCannyEdges(edgeData, weight: 0.5)
+    .build()
+```
+
+Multiple moodboard images at once:
+
+```swift
+let imageFiles = [image1Data, image2Data, image3Data]
+let hints = HintBuilder()
+    .addMoodboardImages(imageFiles, weight: 1.0)
+    .build()
+```
+
+**Available typed methods:**
+
+| Method | Hint Type | Use Case |
+|--------|-----------|----------|
+| `addMoodboardImage(_:weight:)` | `shuffle` | Reference/style images |
+| `addMoodboardImages(_:weight:)` | `shuffle` | Multiple reference images |
+| `addDepthMap(_:weight:)` | `depth` | Depth-based composition control |
+| `addPose(_:weight:)` | `pose` | Human pose control (OpenPose) |
+| `addCannyEdges(_:weight:)` | `canny` | Edge-based control |
+| `addScribble(_:weight:)` | `scribble` | Sketch-based control |
+| `addColorReference(_:weight:)` | `color` | Color palette control |
+| `addLineArt(_:weight:)` | `lineart` | Line art control |
+
+For hint types not covered by the typed methods, use `addHint(type:imageData:weight:)` with either a `HintType` enum value or a custom string:
+
+```swift
+let hints = HintBuilder()
+    .addHint(type: .tile, imageData: tileData)
+    .addHint(type: "custom_type", imageData: customData)
+    .build()
+```
+
+**Available hint types** (`HintType` enum): `shuffle`, `depth`, `pose`, `canny`, `scribble`, `color`, `lineart`, `softedge`, `seg`, `inpaint`, `ip2p`, `mlsd`, `tile`, `blur`, `lowquality`, `gray`, `custom`
 
 ### Using LoRAs
 
