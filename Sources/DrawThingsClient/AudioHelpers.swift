@@ -15,15 +15,15 @@ import Foundation
 public struct AudioHelpers {
 
     public enum AudioError: Error, CustomStringConvertible {
-        case invalidData
+        case invalidData(String)
         case unsupportedDataType(UInt32)
         case bufferCreationFailed
         case fileWriteFailed
 
         public var description: String {
             switch self {
-            case .invalidData:
-                return "Audio tensor data is too small or has an invalid header"
+            case .invalidData(let detail):
+                return "Audio tensor data invalid: \(detail)"
             case .unsupportedDataType(let type):
                 return "Unsupported tensor data type: 0x\(String(type, radix: 16)). Expected CCV_32F (0x4000)."
             case .bufferCreationFailed:
@@ -54,7 +54,7 @@ public struct AudioHelpers {
     /// - Returns: An AVAudioPCMBuffer containing the decoded audio
     public static func ccvTensorToAudioBuffer(_ data: Data, sampleRate: Double = 16000) throws -> AVAudioPCMBuffer {
         guard data.count >= 68 else {
-            throw AudioError.invalidData
+            throw AudioError.invalidData("data too small: \(data.count) bytes, need at least 68")
         }
 
         // Decompress if needed (handles deflate and fpzip compression)
@@ -71,22 +71,40 @@ public struct AudioHelpers {
 
         let formatFlag = header[2]
         let dataType = header[3]
-        let height = Int(header[6])  // num_samples
-        let width = Int(header[7])   // typically 1 for audio
-        let channels = Int(header[8])
 
         // Validate data type is Float32
         guard dataType == CCV_32F else {
             throw AudioError.unsupportedDataType(dataType)
         }
 
-        // For audio tensors, shape is [channels, num_samples]:
-        // In CCV format: dim[8]=channels (2), dim[6]=height (num_samples), dim[7]=width (1)
-        // Total samples per channel = height * width
-        let samplesPerChannel = height * width
+        // CCV tensor dimensions: header[5..16] = dim[0..11]
+        // Audio tensors can be either:
+        //   2D: dim[0]=channels, dim[1]=samples, dim[2]=0, dim[3]=0
+        //   4D (image-like): dim[0]=1, dim[1]=height, dim[2]=width, dim[3]=channels
+        let dim0 = Int(header[5])
+        let dim1 = Int(header[6])
+        let dim2 = Int(header[7])
+        let dim3 = Int(header[8])
+
+        let channels: Int
+        let samplesPerChannel: Int
+
+        if dim2 == 0 && dim3 == 0 {
+            // 2D tensor: [channels, samples] (e.g., LTX audio: [2, 115440])
+            channels = dim0
+            samplesPerChannel = dim1
+        } else if dim2 > 0 && dim3 > 0 {
+            // 4D tensor: [N, height, width, channels]
+            channels = dim3
+            samplesPerChannel = dim1 * dim2
+        } else {
+            // 3D or other layout: try [channels, samples, 1]
+            channels = dim0
+            samplesPerChannel = dim1 * max(dim2, 1)
+        }
 
         guard samplesPerChannel > 0 && channels > 0 else {
-            throw AudioError.invalidData
+            throw AudioError.invalidData("invalid dimensions: channels=\(channels), samplesPerChannel=\(samplesPerChannel) (dims=[\(dim0), \(dim1), \(dim2), \(dim3)]), format=0x\(String(formatFlag, radix: 16))")
         }
 
         let totalFloats = channels * samplesPerChannel
@@ -94,7 +112,7 @@ public struct AudioHelpers {
         let expectedSize = pixelDataOffset + (totalFloats * MemoryLayout<Float>.size)
 
         guard data.count >= expectedSize else {
-            throw AudioError.invalidData
+            throw AudioError.invalidData("data too small after header: \(data.count) bytes, expected \(expectedSize) (channels=\(channels), samples=\(samplesPerChannel))")
         }
 
         // Create audio format (non-interleaved Float32)
