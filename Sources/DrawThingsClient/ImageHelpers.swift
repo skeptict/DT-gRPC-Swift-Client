@@ -11,6 +11,7 @@
 
 import Foundation
 import CoreGraphics
+import UniformTypeIdentifiers
 
 #if os(macOS)
 import AppKit
@@ -152,6 +153,20 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
             return 16  // Default assumption for unknown
         }
     }
+
+    /// The native frame rate for video model families, or `nil` for image-only models.
+    public var nativeFrameRate: Int? {
+        switch self {
+        case .wan21, .wan22:
+            return 16
+        case .hunyuanVideo:
+            return 24
+        case .ltx2, .ltx23:
+            return 25
+        default:
+            return nil
+        }
+    }
 }
 
 // MARK: - Platform Image Extensions
@@ -248,6 +263,43 @@ public struct ImageHelpers {
             throw ImageError.invalidData
         }
         return image
+    }
+
+    /// Save a platform image to a file in the specified format.
+    ///
+    /// - Parameters:
+    ///   - image: The image to save
+    ///   - url: The destination file URL
+    ///   - format: The output format (.png or .jpeg)
+    ///   - jpegQuality: JPEG compression quality (0.0-1.0), only used for .jpeg format
+    public static func saveImage(_ image: PlatformImage, to url: URL, format: ImageFormat = .png, jpegQuality: Float = 0.9) throws {
+        let cgImage: CGImage
+        #if os(macOS)
+        guard let img = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            throw ImageError.conversionFailed
+        }
+        cgImage = img
+        #else
+        guard let img = image.cgImage else {
+            throw ImageError.conversionFailed
+        }
+        cgImage = img
+        #endif
+
+        let utType = format == .png ? UTType.png.identifier as CFString : UTType.jpeg.identifier as CFString
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, utType, 1, nil) else {
+            throw ImageError.conversionFailed
+        }
+
+        var properties: [CFString: Any] = [:]
+        if format == .jpeg {
+            properties[kCGImageDestinationLossyCompressionQuality] = jpegQuality
+        }
+
+        CGImageDestinationAddImage(destination, cgImage, properties as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else {
+            throw ImageError.conversionFailed
+        }
     }
 
     /// Resize an image to the specified size
@@ -1321,6 +1373,13 @@ public struct ImageHelpers {
         return try convertImageToData(maskImage)
     }
     #endif
+}
+
+// MARK: - Image Format
+
+public enum ImageFormat: Sendable {
+    case png
+    case jpeg
 }
 
 // MARK: - Image Errors
