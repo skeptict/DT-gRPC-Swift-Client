@@ -130,6 +130,7 @@ let previewImage = try ImageHelpers.dtTensorToImage(previewData, modelFamily: fa
 | `.wan22` | Wan 2.2 5B | 48 |
 | `.hunyuanVideo` | HunyuanVideo | 16 |
 | `.ltx2` | LTX-2 | 16 |
+| `.ltx23` | LTX-2.3 | 16 |
 
 **Note:** If using **DrawThingsKit**, you don't need to handle this manually - the Kit automatically detects model families and converts previews/results to native `PlatformImage` types.
 

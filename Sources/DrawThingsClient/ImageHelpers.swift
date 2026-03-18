@@ -51,6 +51,8 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
     case flux2
     /// LTX-2 models (16-channel latent, TAESD-only preview)
     case ltx2
+    /// LTX-2.3 models (16-channel latent, TAESD-only preview)
+    case ltx23
     /// Unknown model - will use default coefficients
     case unknown
 
@@ -72,6 +74,8 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
             return .flux2
         case "ltx2":
             return .ltx2
+        case "ltx2_3":
+            return .ltx23
         case "flux1", "hidreami1":
             return .flux
         case "wan21_1_3b", "wan21_14b":
@@ -93,6 +97,9 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
         // Fall back to substring matching for filenames
         if lowercased.contains("flux2") {
             return .flux2
+        }
+        if lowercased.contains("ltx2.3") || lowercased.contains("ltx-2.3") || lowercased.contains("ltx_2.3") || lowercased.contains("ltx_2_3") || lowercased.contains("ltx23") {
+            return .ltx23
         }
         if lowercased.contains("ltx2") || lowercased.contains("ltx-2") || lowercased.contains("ltx_2") {
             return .ltx2
@@ -135,7 +142,7 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
         switch self {
         case .sd1, .sdxl:
             return 4
-        case .sd3, .flux, .hunyuanVideo, .qwen, .zImage, .wan21, .ltx2:
+        case .sd3, .flux, .hunyuanVideo, .qwen, .zImage, .wan21, .ltx2, .ltx23:
             return 16
         case .flux2:
             return 32
@@ -480,7 +487,7 @@ public struct ImageHelpers {
 
         // For LTX-2 preview latents, strip audio latent rows from the bottom
         let family = modelFamily ?? .unknown
-        if family == .ltx2 && dim0 > 0 && width > 0 {
+        if (family == .ltx2 || family == .ltx23) && dim0 > 0 && width > 0 {
             let (_, audioHeight) = ltx2ExtractAudioFramesAndHeight(
                 dim0: dim0, height: height, width: width
             )
@@ -535,9 +542,9 @@ public struct ImageHelpers {
                     case .hunyuanVideo:
                         DrawThingsClientLogger.debug("dtTensorToImage: using HunyuanVideo 16-channel conversion")
                         convertHunyuanVideoToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
-                    case .ltx2:
-                        // LTX-2 uses Flux-like coefficients as a reasonable fallback
-                        DrawThingsClientLogger.debug("dtTensorToImage: using Flux 16-channel conversion for LTX-2 fallback")
+                    case .ltx2, .ltx23:
+                        // LTX-2/2.3 uses Flux-like coefficients as a reasonable fallback
+                        DrawThingsClientLogger.debug("dtTensorToImage: using Flux 16-channel conversion for LTX fallback")
                         convertFluxToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
                     case .flux, .zImage, .unknown:
                         // Z Image uses Flux-like latent space
