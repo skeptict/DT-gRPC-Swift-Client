@@ -36,16 +36,12 @@ The following features have been tested and confirmed working:
 - **Advanced Optimization**: TEA Cache and other performance optimizations
 - **Shared Secret**: API support for using a shared secret with your gRPC server connection
 - **Response Compression**: The library can receive compressed responses from the gRPC server
+- **Audio**: Audio functionality (for LTX-2) is implemented
 
 ### ⚠️ Untested Features
 
 The following features are available in the protocol but have not yet been tested:
 - **File Upload**: Uploading models or other files to the server
-
-The following features are at least partially implemented in the API but have not yet been tested:
-- **Audio**: Audio functionality (for LTX-2) is implemented but not tested
-
-Contributions and testing reports for these features are welcome!
 
 ## Requirements
 
