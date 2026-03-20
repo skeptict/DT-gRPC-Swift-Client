@@ -113,20 +113,29 @@ let previewImage = try ImageHelpers.dtTensorToImage(previewData, modelFamily: fa
 ```
 
 **Supported Model Families:**
-| Family | Models | Latent Channels |
-|--------|--------|-----------------|
-| `.sd1` | SD 1.x, SD 2.x | 4 |
-| `.sdxl` | SDXL Base, SDXL Refiner, SSD-1B | 4 |
-| `.sd3` | Stable Diffusion 3, SD3 Large | 16 |
-| `.flux` | Flux.1, HiDream | 16 |
-| `.flux2` | Flux 2 (9B, 4B) | 32 |
-| `.qwen` | Qwen Image, Qwen Image Edit | 16 |
-| `.zImage` | Z Image | 16 |
-| `.wan21` | Wan 2.1 (1.3B, 14B) | 16 |
-| `.wan22` | Wan 2.2 5B | 48 |
-| `.hunyuanVideo` | HunyuanVideo | 16 |
-| `.ltx2` | LTX-2 | 16 |
-| `.ltx23` | LTX-2.3 | 16 |
+| Family | Models | Latent Channels | Native FPS |
+|--------|--------|-----------------|------------|
+| `.sd1` | SD 1.x, SD 2.x | 4 | — |
+| `.sdxl` | SDXL Base, SDXL Refiner, SSD-1B | 4 | — |
+| `.sd3` | Stable Diffusion 3, SD3 Large | 16 | — |
+| `.flux` | Flux.1, HiDream | 16 | — |
+| `.flux2` | Flux 2 (9B, 4B) | 32 | — |
+| `.qwen` | Qwen Image, Qwen Image Edit | 16 | — |
+| `.zImage` | Z Image | 16 | — |
+| `.wan21` | Wan 2.1 (1.3B, 14B) | 16 | 16 |
+| `.wan22` | Wan 2.2 5B | 48 | 16 |
+| `.hunyuanVideo` | HunyuanVideo | 16 | 24 |
+| `.ltx2` | LTX-2 | 16 | 25 |
+| `.ltx23` | LTX-2.3 | 16 | 25 |
+
+The `nativeFrameRate` property returns the model's native FPS for video models, or `nil` for image-only models:
+
+```swift
+let family = LatentModelFamily.detect(from: "wan21_1_3b")
+if let fps = family.nativeFrameRate {
+    print("Video model, native FPS: \(fps)")  // 16
+}
+```
 
 **Note:** If using **DrawThingsKit**, you don't need to handle this manually - the Kit automatically detects model families and converts previews/results to native `PlatformImage` types.
 
@@ -776,6 +785,10 @@ let tensorData = try ImageHelpers.imageToDTTensor(image, forceRGB: true)
 
 // Convert from DTTensor
 let resultImage = try ImageHelpers.dtTensorToImage(tensorData)
+
+// Save to file (PNG or JPEG)
+try ImageHelpers.saveImage(image, to: outputURL, format: .png)
+try ImageHelpers.saveImage(image, to: jpegURL, format: .jpeg, jpegQuality: 0.85)
 
 // Other cross-platform utilities
 let resized = ImageHelpers.resizeImage(image, to: CGSize(width: 512, height: 512))
