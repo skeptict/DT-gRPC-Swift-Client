@@ -11,7 +11,7 @@
 
 import Compression
 import Foundation
-import C_fpzip
+import CFpzip
 
 /// Handles decompression of CCV tensors that may be compressed with zip (deflate) or fpzip codecs.
 ///
