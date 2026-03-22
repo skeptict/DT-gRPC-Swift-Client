@@ -31,8 +31,9 @@ public enum SamplerType: Int8, Enum, Verifiable {
   case ddimtrailing = 16
   case unipctrailing = 17
   case unipcays = 18
+  case tcdtrailing = 19
 
-  public static var max: SamplerType { return .unipcays }
+  public static var max: SamplerType { return .tcdtrailing }
   public static var min: SamplerType { return .dpmpp2mkarras }
 }
 
@@ -106,6 +107,20 @@ public enum LoRAMode: Int8, Enum, Verifiable {
 }
 
 
+public enum CompressionMethod: Int8, Enum, Verifiable {
+  public typealias T = Int8
+  public static var byteSize: Int { return MemoryLayout<Int8>.size }
+  public var value: Int8 { return self.rawValue }
+  case disabled = 0
+  case h264 = 1
+  case h265 = 2
+  case jpeg = 3
+
+  public static var max: CompressionMethod { return .jpeg }
+  public static var min: CompressionMethod { return .disabled }
+}
+
+
 public struct Control: FlatBufferObject, Verifiable, ObjectAPIPacker {
 
   static func validateVersion() { FlatBuffersVersion_25_9_23() }
@@ -145,14 +160,14 @@ public struct Control: FlatBufferObject, Verifiable, ObjectAPIPacker {
   public var inputOverride: ControlInputType { let o = _accessor.offset(VTOFFSET.inputOverride.v); return o == 0 ? .unspecified : ControlInputType(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .unspecified }
   public static func startControl(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 10) }
   public static func add(file: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: file, at: VTOFFSET.file.p) }
-  public static func add(weight: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: weight, def: 1.0, at: VTOFFSET.weight.p) }
+  public static func add(weight: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: weight, def: 0, at: VTOFFSET.weight.p) }
   public static func add(guidanceStart: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: guidanceStart, def: 0.0, at: VTOFFSET.guidanceStart.p) }
-  public static func add(guidanceEnd: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: guidanceEnd, def: 1.0, at: VTOFFSET.guidanceEnd.p) }
+  public static func add(guidanceEnd: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: guidanceEnd, def: 0, at: VTOFFSET.guidanceEnd.p) }
   public static func add(noPrompt: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: noPrompt, def: false,
    at: VTOFFSET.noPrompt.p) }
-  public static func add(globalAveragePooling: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: globalAveragePooling, def: true,
+  public static func add(globalAveragePooling: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: globalAveragePooling, def: false,
    at: VTOFFSET.globalAveragePooling.p) }
-  public static func add(downSamplingRate: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: downSamplingRate, def: 1.0, at: VTOFFSET.downSamplingRate.p) }
+  public static func add(downSamplingRate: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: downSamplingRate, def: 0, at: VTOFFSET.downSamplingRate.p) }
   public static func add(controlMode: ControlMode, _ fbb: inout FlatBufferBuilder) { fbb.add(element: controlMode.rawValue, def: 0, at: VTOFFSET.controlMode.p) }
   public static func addVectorOf(targetBlocks: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: targetBlocks, at: VTOFFSET.targetBlocks.p) }
   public static func add(inputOverride: ControlInputType, _ fbb: inout FlatBufferBuilder) { fbb.add(element: inputOverride.rawValue, def: 0, at: VTOFFSET.inputOverride.p) }
@@ -460,6 +475,8 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
     case causalInferencePad = 166
     case cfgZeroStar = 168
     case cfgZeroInitSteps = 170
+    case compressionArtifacts = 172
+    case compressionArtifactsQuality = 174
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
@@ -558,7 +575,9 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
   public var causalInferencePad: Int32 { let o = _accessor.offset(VTOFFSET.causalInferencePad.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
   public var cfgZeroStar: Bool { let o = _accessor.offset(VTOFFSET.cfgZeroStar.v); return o == 0 ? false : _accessor.readBuffer(of: Bool.self, at: o) }
   public var cfgZeroInitSteps: Int32 { let o = _accessor.offset(VTOFFSET.cfgZeroInitSteps.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
-  public static func startGenerationConfiguration(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 84) }
+  public var compressionArtifacts: CompressionMethod { let o = _accessor.offset(VTOFFSET.compressionArtifacts.v); return o == 0 ? .disabled : CompressionMethod(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .disabled }
+  public var compressionArtifactsQuality: Float32 { let o = _accessor.offset(VTOFFSET.compressionArtifactsQuality.v); return o == 0 ? 43.1 : _accessor.readBuffer(of: Float32.self, at: o) }
+  public static func startGenerationConfiguration(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 86) }
   public static func add(id: Int64, _ fbb: inout FlatBufferBuilder) { fbb.add(element: id, def: 0, at: VTOFFSET.id.p) }
   public static func add(startWidth: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: startWidth, def: 0, at: VTOFFSET.startWidth.p) }
   public static func add(startHeight: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: startHeight, def: 0, at: VTOFFSET.startHeight.p) }
@@ -576,17 +595,17 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
   public static func add(hiresFixStartHeight: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: hiresFixStartHeight, def: 0, at: VTOFFSET.hiresFixStartHeight.p) }
   public static func add(hiresFixStrength: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: hiresFixStrength, def: 0.7, at: VTOFFSET.hiresFixStrength.p) }
   public static func add(upscaler: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: upscaler, at: VTOFFSET.upscaler.p) }
-  public static func add(imageGuidanceScale: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: imageGuidanceScale, def: 1.5, at: VTOFFSET.imageGuidanceScale.p) }
+  public static func add(imageGuidanceScale: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: imageGuidanceScale, def: 0, at: VTOFFSET.imageGuidanceScale.p) }
   public static func add(seedMode: SeedMode, _ fbb: inout FlatBufferBuilder) { fbb.add(element: seedMode.rawValue, def: 0, at: VTOFFSET.seedMode.p) }
-  public static func add(clipSkip: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: clipSkip, def: 1, at: VTOFFSET.clipSkip.p) }
+  public static func add(clipSkip: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: clipSkip, def: 0, at: VTOFFSET.clipSkip.p) }
   public static func addVectorOf(controls: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: controls, at: VTOFFSET.controls.p) }
   public static func addVectorOf(loras: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: loras, at: VTOFFSET.loras.p) }
   public static func add(maskBlur: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: maskBlur, def: 0.0, at: VTOFFSET.maskBlur.p) }
   public static func add(faceRestoration: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: faceRestoration, at: VTOFFSET.faceRestoration.p) }
-  public static func add(clipWeight: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: clipWeight, def: 1.0, at: VTOFFSET.clipWeight.p) }
-  public static func add(negativePromptForImagePrior: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: negativePromptForImagePrior, def: true,
+  public static func add(clipWeight: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: clipWeight, def: 0, at: VTOFFSET.clipWeight.p) }
+  public static func add(negativePromptForImagePrior: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: negativePromptForImagePrior, def: false,
    at: VTOFFSET.negativePromptForImagePrior.p) }
-  public static func add(imagePriorSteps: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: imagePriorSteps, def: 5, at: VTOFFSET.imagePriorSteps.p) }
+  public static func add(imagePriorSteps: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: imagePriorSteps, def: 0, at: VTOFFSET.imagePriorSteps.p) }
   public static func add(refinerModel: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: refinerModel, at: VTOFFSET.refinerModel.p) }
   public static func add(originalImageHeight: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: originalImageHeight, def: 0, at: VTOFFSET.originalImageHeight.p) }
   public static func add(originalImageWidth: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: originalImageWidth, def: 0, at: VTOFFSET.originalImageWidth.p) }
@@ -594,40 +613,40 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
   public static func add(cropLeft: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cropLeft, def: 0, at: VTOFFSET.cropLeft.p) }
   public static func add(targetImageHeight: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: targetImageHeight, def: 0, at: VTOFFSET.targetImageHeight.p) }
   public static func add(targetImageWidth: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: targetImageWidth, def: 0, at: VTOFFSET.targetImageWidth.p) }
-  public static func add(aestheticScore: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: aestheticScore, def: 6.0, at: VTOFFSET.aestheticScore.p) }
-  public static func add(negativeAestheticScore: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: negativeAestheticScore, def: 2.5, at: VTOFFSET.negativeAestheticScore.p) }
+  public static func add(aestheticScore: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: aestheticScore, def: 0, at: VTOFFSET.aestheticScore.p) }
+  public static func add(negativeAestheticScore: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: negativeAestheticScore, def: 0, at: VTOFFSET.negativeAestheticScore.p) }
   public static func add(zeroNegativePrompt: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: zeroNegativePrompt, def: false,
    at: VTOFFSET.zeroNegativePrompt.p) }
   public static func add(refinerStart: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: refinerStart, def: 0.7, at: VTOFFSET.refinerStart.p) }
   public static func add(negativeOriginalImageHeight: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: negativeOriginalImageHeight, def: 0, at: VTOFFSET.negativeOriginalImageHeight.p) }
   public static func add(negativeOriginalImageWidth: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: negativeOriginalImageWidth, def: 0, at: VTOFFSET.negativeOriginalImageWidth.p) }
   public static func add(name: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: name, at: VTOFFSET.name.p) }
-  public static func add(fpsId: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: fpsId, def: 5, at: VTOFFSET.fpsId.p) }
-  public static func add(motionBucketId: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: motionBucketId, def: 127, at: VTOFFSET.motionBucketId.p) }
+  public static func add(fpsId: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: fpsId, def: 0, at: VTOFFSET.fpsId.p) }
+  public static func add(motionBucketId: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: motionBucketId, def: 0, at: VTOFFSET.motionBucketId.p) }
   public static func add(condAug: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: condAug, def: 0.02, at: VTOFFSET.condAug.p) }
-  public static func add(startFrameCfg: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: startFrameCfg, def: 1.0, at: VTOFFSET.startFrameCfg.p) }
-  public static func add(numFrames: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: numFrames, def: 14, at: VTOFFSET.numFrames.p) }
+  public static func add(startFrameCfg: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: startFrameCfg, def: 0, at: VTOFFSET.startFrameCfg.p) }
+  public static func add(numFrames: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: numFrames, def: 0, at: VTOFFSET.numFrames.p) }
   public static func add(maskBlurOutset: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: maskBlurOutset, def: 0, at: VTOFFSET.maskBlurOutset.p) }
   public static func add(sharpness: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: sharpness, def: 0.0, at: VTOFFSET.sharpness.p) }
-  public static func add(shift: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: shift, def: 1.0, at: VTOFFSET.shift.p) }
-  public static func add(stage2Steps: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: stage2Steps, def: 10, at: VTOFFSET.stage2Steps.p) }
-  public static func add(stage2Cfg: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: stage2Cfg, def: 1.0, at: VTOFFSET.stage2Cfg.p) }
-  public static func add(stage2Shift: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: stage2Shift, def: 1.0, at: VTOFFSET.stage2Shift.p) }
+  public static func add(shift: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: shift, def: 0, at: VTOFFSET.shift.p) }
+  public static func add(stage2Steps: UInt32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: stage2Steps, def: 0, at: VTOFFSET.stage2Steps.p) }
+  public static func add(stage2Cfg: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: stage2Cfg, def: 0, at: VTOFFSET.stage2Cfg.p) }
+  public static func add(stage2Shift: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: stage2Shift, def: 0, at: VTOFFSET.stage2Shift.p) }
   public static func add(tiledDecoding: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: tiledDecoding, def: false,
    at: VTOFFSET.tiledDecoding.p) }
-  public static func add(decodingTileWidth: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: decodingTileWidth, def: 10, at: VTOFFSET.decodingTileWidth.p) }
-  public static func add(decodingTileHeight: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: decodingTileHeight, def: 10, at: VTOFFSET.decodingTileHeight.p) }
-  public static func add(decodingTileOverlap: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: decodingTileOverlap, def: 2, at: VTOFFSET.decodingTileOverlap.p) }
-  public static func add(stochasticSamplingGamma: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: stochasticSamplingGamma, def: 0.3, at: VTOFFSET.stochasticSamplingGamma.p) }
-  public static func add(preserveOriginalAfterInpaint: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: preserveOriginalAfterInpaint, def: true,
+  public static func add(decodingTileWidth: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: decodingTileWidth, def: 0, at: VTOFFSET.decodingTileWidth.p) }
+  public static func add(decodingTileHeight: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: decodingTileHeight, def: 0, at: VTOFFSET.decodingTileHeight.p) }
+  public static func add(decodingTileOverlap: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: decodingTileOverlap, def: 0, at: VTOFFSET.decodingTileOverlap.p) }
+  public static func add(stochasticSamplingGamma: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: stochasticSamplingGamma, def: 0, at: VTOFFSET.stochasticSamplingGamma.p) }
+  public static func add(preserveOriginalAfterInpaint: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: preserveOriginalAfterInpaint, def: false,
    at: VTOFFSET.preserveOriginalAfterInpaint.p) }
   public static func add(tiledDiffusion: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: tiledDiffusion, def: false,
    at: VTOFFSET.tiledDiffusion.p) }
-  public static func add(diffusionTileWidth: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: diffusionTileWidth, def: 16, at: VTOFFSET.diffusionTileWidth.p) }
-  public static func add(diffusionTileHeight: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: diffusionTileHeight, def: 16, at: VTOFFSET.diffusionTileHeight.p) }
-  public static func add(diffusionTileOverlap: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: diffusionTileOverlap, def: 2, at: VTOFFSET.diffusionTileOverlap.p) }
+  public static func add(diffusionTileWidth: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: diffusionTileWidth, def: 0, at: VTOFFSET.diffusionTileWidth.p) }
+  public static func add(diffusionTileHeight: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: diffusionTileHeight, def: 0, at: VTOFFSET.diffusionTileHeight.p) }
+  public static func add(diffusionTileOverlap: UInt16, _ fbb: inout FlatBufferBuilder) { fbb.add(element: diffusionTileOverlap, def: 0, at: VTOFFSET.diffusionTileOverlap.p) }
   public static func add(upscalerScaleFactor: UInt8, _ fbb: inout FlatBufferBuilder) { fbb.add(element: upscalerScaleFactor, def: 0, at: VTOFFSET.upscalerScaleFactor.p) }
-  public static func add(t5TextEncoder: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: t5TextEncoder, def: true,
+  public static func add(t5TextEncoder: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: t5TextEncoder, def: false,
    at: VTOFFSET.t5TextEncoder.p) }
   public static func add(separateClipL: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: separateClipL, def: false,
    at: VTOFFSET.separateClipL.p) }
@@ -635,27 +654,29 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
   public static func add(separateOpenClipG: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: separateOpenClipG, def: false,
    at: VTOFFSET.separateOpenClipG.p) }
   public static func add(openClipGText: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: openClipGText, at: VTOFFSET.openClipGText.p) }
-  public static func add(speedUpWithGuidanceEmbed: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: speedUpWithGuidanceEmbed, def: true,
+  public static func add(speedUpWithGuidanceEmbed: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: speedUpWithGuidanceEmbed, def: false,
    at: VTOFFSET.speedUpWithGuidanceEmbed.p) }
-  public static func add(guidanceEmbed: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: guidanceEmbed, def: 3.5, at: VTOFFSET.guidanceEmbed.p) }
-  public static func add(resolutionDependentShift: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: resolutionDependentShift, def: true,
+  public static func add(guidanceEmbed: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: guidanceEmbed, def: 0, at: VTOFFSET.guidanceEmbed.p) }
+  public static func add(resolutionDependentShift: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: resolutionDependentShift, def: false,
    at: VTOFFSET.resolutionDependentShift.p) }
-  public static func add(teaCacheStart: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: teaCacheStart, def: 5, at: VTOFFSET.teaCacheStart.p) }
-  public static func add(teaCacheEnd: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: teaCacheEnd, def: -1, at: VTOFFSET.teaCacheEnd.p) }
+  public static func add(teaCacheStart: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: teaCacheStart, def: 0, at: VTOFFSET.teaCacheStart.p) }
+  public static func add(teaCacheEnd: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: teaCacheEnd, def: 0, at: VTOFFSET.teaCacheEnd.p) }
   public static func add(teaCacheThreshold: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: teaCacheThreshold, def: 0.06, at: VTOFFSET.teaCacheThreshold.p) }
   public static func add(teaCache: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: teaCache, def: false,
    at: VTOFFSET.teaCache.p) }
   public static func add(separateT5: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: separateT5, def: false,
    at: VTOFFSET.separateT5.p) }
   public static func add(t5Text: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: t5Text, at: VTOFFSET.t5Text.p) }
-  public static func add(teaCacheMaxSkipSteps: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: teaCacheMaxSkipSteps, def: 3, at: VTOFFSET.teaCacheMaxSkipSteps.p) }
+  public static func add(teaCacheMaxSkipSteps: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: teaCacheMaxSkipSteps, def: 0, at: VTOFFSET.teaCacheMaxSkipSteps.p) }
   public static func add(causalInferenceEnabled: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: causalInferenceEnabled, def: false,
    at: VTOFFSET.causalInferenceEnabled.p) }
-  public static func add(causalInference: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: causalInference, def: 3, at: VTOFFSET.causalInference.p) }
+  public static func add(causalInference: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: causalInference, def: 0, at: VTOFFSET.causalInference.p) }
   public static func add(causalInferencePad: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: causalInferencePad, def: 0, at: VTOFFSET.causalInferencePad.p) }
   public static func add(cfgZeroStar: Bool, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cfgZeroStar, def: false,
    at: VTOFFSET.cfgZeroStar.p) }
   public static func add(cfgZeroInitSteps: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cfgZeroInitSteps, def: 0, at: VTOFFSET.cfgZeroInitSteps.p) }
+  public static func add(compressionArtifacts: CompressionMethod, _ fbb: inout FlatBufferBuilder) { fbb.add(element: compressionArtifacts.rawValue, def: 0, at: VTOFFSET.compressionArtifacts.p) }
+  public static func add(compressionArtifactsQuality: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: compressionArtifactsQuality, def: 0, at: VTOFFSET.compressionArtifactsQuality.p) }
   public static func endGenerationConfiguration(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
   public static func createGenerationConfiguration(
     _ fbb: inout FlatBufferBuilder,
@@ -740,7 +761,9 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
     causalInference: Int32 = 3,
     causalInferencePad: Int32 = 0,
     cfgZeroStar: Bool = false,
-    cfgZeroInitSteps: Int32 = 0
+    cfgZeroInitSteps: Int32 = 0,
+    compressionArtifacts: CompressionMethod = .disabled,
+    compressionArtifactsQuality: Float32 = 43.1
   ) -> Offset {
     let __start = GenerationConfiguration.startGenerationConfiguration(&fbb)
     GenerationConfiguration.add(id: id, &fbb)
@@ -825,9 +848,11 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
     GenerationConfiguration.add(causalInferencePad: causalInferencePad, &fbb)
     GenerationConfiguration.add(cfgZeroStar: cfgZeroStar, &fbb)
     GenerationConfiguration.add(cfgZeroInitSteps: cfgZeroInitSteps, &fbb)
+    GenerationConfiguration.add(compressionArtifacts: compressionArtifacts, &fbb)
+    GenerationConfiguration.add(compressionArtifactsQuality: compressionArtifactsQuality, &fbb)
     return GenerationConfiguration.endGenerationConfiguration(&fbb, start: __start)
   }
-  
+
 
   public mutating func unpack() -> GenerationConfigurationT {
     return GenerationConfigurationT(&self)
@@ -987,6 +1012,8 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
     GenerationConfiguration.add(causalInferencePad: obj.causalInferencePad, &builder)
     GenerationConfiguration.add(cfgZeroStar: obj.cfgZeroStar, &builder)
     GenerationConfiguration.add(cfgZeroInitSteps: obj.cfgZeroInitSteps, &builder)
+    GenerationConfiguration.add(compressionArtifacts: obj.compressionArtifacts, &builder)
+    GenerationConfiguration.add(compressionArtifactsQuality: obj.compressionArtifactsQuality, &builder)
     return GenerationConfiguration.endGenerationConfiguration(&builder, start: __root)
   }
 
@@ -1074,6 +1101,8 @@ public struct GenerationConfiguration: FlatBufferObject, Verifiable, ObjectAPIPa
     try _v.visit(field: VTOFFSET.causalInferencePad.p, fieldName: "causalInferencePad", required: false, type: Int32.self)
     try _v.visit(field: VTOFFSET.cfgZeroStar.p, fieldName: "cfgZeroStar", required: false, type: Bool.self)
     try _v.visit(field: VTOFFSET.cfgZeroInitSteps.p, fieldName: "cfgZeroInitSteps", required: false, type: Int32.self)
+    try _v.visit(field: VTOFFSET.compressionArtifacts.p, fieldName: "compressionArtifacts", required: false, type: CompressionMethod.self)
+    try _v.visit(field: VTOFFSET.compressionArtifactsQuality.p, fieldName: "compressionArtifactsQuality", required: false, type: Float32.self)
     _v.finish()
   }
 }
@@ -1162,6 +1191,8 @@ public class GenerationConfigurationT: NativeObject {
   public var causalInferencePad: Int32
   public var cfgZeroStar: Bool
   public var cfgZeroInitSteps: Int32
+  public var compressionArtifacts: CompressionMethod
+  public var compressionArtifactsQuality: Float32
 
   public init(_ _t: inout GenerationConfiguration) {
     id = _t.id
@@ -1254,6 +1285,8 @@ public class GenerationConfigurationT: NativeObject {
     causalInferencePad = _t.causalInferencePad
     cfgZeroStar = _t.cfgZeroStar
     cfgZeroInitSteps = _t.cfgZeroInitSteps
+    compressionArtifacts = _t.compressionArtifacts
+    compressionArtifactsQuality = _t.compressionArtifactsQuality
   }
 
   public init() {
@@ -1331,6 +1364,8 @@ public class GenerationConfigurationT: NativeObject {
     causalInferencePad = 0
     cfgZeroStar = false
     cfgZeroInitSteps = 0
+    compressionArtifacts = .disabled
+    compressionArtifactsQuality = 43.1
   }
 
   public func serialize() -> ByteBuffer { return serialize(type: GenerationConfiguration.self) }

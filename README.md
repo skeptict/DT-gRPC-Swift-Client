@@ -13,6 +13,7 @@ A Swift client library for interacting with Draw Things gRPC server, designed fo
 - **Progress Tracking**: Real-time progress updates during image generation
 - **Image Utilities**: Built-in helpers for image conversion and manipulation
 - **Type Safety**: Full Swift type safety with generated protobuf code
+- **Legacy Processor Support**: Library runs on both Intel and Apple Silicon processors
 
 ## Feature Status
 
@@ -31,16 +32,16 @@ The following features have been tested and confirmed working:
 - **Progress Tracking**: Real-time generation progress updates
 - **Preview Images**: Receive preview images during generation
 - **Model Metadata**: Query available models and samplers
+- **Multi-stage Models**: Stage 2 parameters for multi-stage generation pipelines
+- **Advanced Optimization**: TEA Cache and other performance optimizations
+- **Shared Secret**: API support for using a shared secret with your gRPC server connection
+- **Response Compression**: The library can receive compressed responses from the gRPC server
+- **Audio**: Audio functionality (for LTX-2) is implemented
 
 ### ⚠️ Untested Features
 
 The following features are available in the protocol but have not yet been tested:
-
-- **Multi-stage Models**: Stage 2 parameters for multi-stage generation pipelines
-- **Advanced Optimization**: TEA Cache and other performance optimizations
 - **File Upload**: Uploading models or other files to the server
-
-Contributions and testing reports for these features are welcome!
 
 ## Requirements
 
@@ -54,12 +55,22 @@ Contributions and testing reports for these features are welcome!
 
 To use this framework, you need to configure the Draw Things gRPC server with the following settings:
 
-1. **Response Compression**: Must be **disabled**
-   - Having server-side compression enabled will cause failure, the framework does not currently have the ability to decompress responses
+1. **Response Compression**: May be **enabled** or **disabled**
+   - Having server-side compression enabled is supported, the client has the ability to decompress the responses
+   
+2. **Transport Layer Security**: May be **enabled** or **disabled**
+   - Either mode is supported, enabling TLS is recommended
+   
+3. **Bridge Mode**: May be **enabled** or **disabled**
+   - Generation pass through to another server, including DT+ is supported
+   - Bring Your Own LoRA (BYOL) feature of DT+ is not supported in Bridge Mode currently. This is a DT+ service limitation, not a limitation of the DrawThingsClient
 
 2. **Enable Model Browsing**: Recommended to be **enabled**
-   - This allows the framework to query available models, samplers, and other metadata
-   - Required for proper initialization and model selection
+   - This allows the framework to query available checkpoint models, controlnets, LoRAs, etc.
+   - Required for proper initialization and model selection in a UI
+   
+3. **Share Secret**: May be **enabled** or **disabled**
+    - The shared secret is implemented in the client but the application must also support passing that optional paramter with the generation request.
 
 ## Important: Image Data Formats
 
@@ -68,8 +79,8 @@ Draw Things uses a custom tensor format (DTTensor) for image data exchange, **no
 ### DTTensor Format
 
 The DTTensor format consists of:
-- **68-byte header** containing dimensions, channel count, and compression flag
-- **Float16 RGB pixel data** with values in range [-1, 1]
+- **68-byte header** containing dimensions, channel count, and compression identifier
+- **Float16 RGB pixel data** with values in range [-1, 1] (raw or compressed with deflate/fpzip)
 
 The `ImageHelpers` class provides conversion utilities:
 
@@ -102,16 +113,29 @@ let previewImage = try ImageHelpers.dtTensorToImage(previewData, modelFamily: fa
 ```
 
 **Supported Model Families:**
-| Family | Models | Latent Channels |
-|--------|--------|-----------------|
-| `.sd1` | SD 1.x, SD 2.x | 4 |
-| `.sdxl` | SDXL Base, SDXL Refiner | 4 |
-| `.sd3` | Stable Diffusion 3 | 16 |
-| `.flux` | Flux.1, HiDream | 16 |
-| `.qwen` | Qwen Image, Qwen Image Edit | 16 |
-| `.wan21` | Wan 2.1 (1.3B, 14B) | 16 |
-| `.wan22` | Wan 2.2 5B | 48 |
-| `.hunyuanVideo` | HunyuanVideo | 16 |
+| Family | Models | Latent Channels | Native FPS |
+|--------|--------|-----------------|------------|
+| `.sd1` | SD 1.x, SD 2.x | 4 | — |
+| `.sdxl` | SDXL Base, SDXL Refiner, SSD-1B | 4 | — |
+| `.sd3` | Stable Diffusion 3, SD3 Large | 16 | — |
+| `.flux` | Flux.1, HiDream | 16 | — |
+| `.flux2` | Flux 2 (9B, 4B) | 32 | — |
+| `.qwen` | Qwen Image, Qwen Image Edit | 16 | — |
+| `.zImage` | Z Image | 16 | — |
+| `.wan21` | Wan 2.1 (1.3B, 14B) | 16 | 16 |
+| `.wan22` | Wan 2.2 5B | 48 | 16 |
+| `.hunyuanVideo` | HunyuanVideo | 16 | 24 |
+| `.ltx2` | LTX-2 | 16 | 25 |
+| `.ltx23` | LTX-2.3 | 16 | 25 |
+
+The `nativeFrameRate` property returns the model's native FPS for video models, or `nil` for image-only models:
+
+```swift
+let family = LatentModelFamily.detect(from: "wan21_1_3b")
+if let fps = family.nativeFrameRate {
+    print("Video model, native FPS: \(fps)")  // 16
+}
+```
 
 **Note:** If using **DrawThingsKit**, you don't need to handle this manually - the Kit automatically detects model families and converts previews/results to native `PlatformImage` types.
 
@@ -208,6 +232,7 @@ Samplers are represented as integers in the configuration:
 | `ddimtrailing` | `16` |
 | `unipctrailing` | `17` |
 | `unipcays` | `18` |
+| `tcdtrailing` | `19` |
 
 ## Installation
 
@@ -223,7 +248,7 @@ Or add it to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/euphoriacyberware-ai/DT-gRPC-Swift-Client", from: "1.0.0")
+    .package(url: "https://github.com/euphoriacyberware-ai/DT-gRPC-Swift-Client", from: "1.2.5")
 ]
 ```
 
@@ -235,14 +260,13 @@ This library provides two API levels:
 
 | API | Class | Use Case |
 |-----|-------|----------|
-| **High-level** | `DrawThingsClient` | Simple integration, handles DTTensor conversion automatically, returns `[NSImage]` |
-| **Low-level** | `DrawThingsService` | Full control, requires manual DTTensor conversion, supports hints/controls, returns `[Data]` |
+| **High-level** | `DrawThingsClient` | Simple integration, handles DTTensor conversion automatically, supports hints/moodboard, returns `[PlatformImage]` |
+| **Low-level** | `DrawThingsService` | Full control, requires manual DTTensor conversion, supports all parameters including preview callbacks, returns `[Data]` |
 
 For most use cases, start with `DrawThingsClient`. Use `DrawThingsService` when you need:
-- Hints/moodboard images
-- ControlNet support
 - Progress callbacks with preview images
 - Custom handling of raw tensor data
+- Access to all generation parameters (contents, override, scaleFactor)
 
 ### Basic Usage
 
@@ -321,6 +345,26 @@ let config = DrawThingsConfiguration(
 ```
 See ./Examples/Config from JSON.swift within this project for usable functions which populate a DrawThingsConfiguration from a Draw Things JSON configuration passed in a String value.
 
+### Shared Secret Authentication
+
+If the Draw Things server requires a shared secret, pass it with the generation request:
+
+```swift
+// High-level API
+let images = try await client.generateImage(
+    prompt: "A beautiful landscape",
+    configuration: config,
+    sharedSecret: "my-secret-key"
+)
+
+// Low-level API
+let resultData = try await service.generateImage(
+    prompt: "A beautiful landscape",
+    configuration: configData,
+    sharedSecret: "my-secret-key"
+)
+```
+
 ### Image-to-Image Generation
 
 Using the high-level `DrawThingsClient` API (handles DTTensor conversion automatically):
@@ -339,7 +383,7 @@ Using the lower-level `DrawThingsService` API (requires manual DTTensor conversi
 
 ```swift
 let inputImage = NSImage(named: "input.jpg")!
-let imageData = try ImageHelpers.nsImageToDTTensor(inputImage, forceRGB: true)
+let imageData = try ImageHelpers.imageToDTTensor(inputImage, forceRGB: true)
 let configData = try config.toFlatBufferData()
 
 let resultData = try await service.generateImage(
@@ -349,7 +393,7 @@ let resultData = try await service.generateImage(
 )
 
 // Convert results back to NSImage
-let images = try resultData.map { try ImageHelpers.dtTensorToNSImage($0) }
+let images = try resultData.map { try ImageHelpers.dtTensorToImage($0) }
 ```
 
 ### Inpainting with Mask
@@ -374,8 +418,8 @@ Using the lower-level `DrawThingsService` API:
 let inputImage = NSImage(named: "photo.jpg")!
 let maskImage = NSImage(named: "mask.png")!
 
-let imageData = try ImageHelpers.nsImageToDTTensor(inputImage, forceRGB: true)
-let maskData = try ImageHelpers.nsImageToDTTensor(maskImage, forceRGB: true)
+let imageData = try ImageHelpers.imageToDTTensor(inputImage, forceRGB: true)
+let maskData = try ImageHelpers.imageToDTTensor(maskImage, forceRGB: true)
 let configData = try config.toFlatBufferData()
 
 let resultData = try await service.generateImage(
@@ -385,17 +429,17 @@ let resultData = try await service.generateImage(
     mask: maskData
 )
 
-let images = try resultData.map { try ImageHelpers.dtTensorToNSImage($0) }
+let images = try resultData.map { try ImageHelpers.dtTensorToImage($0) }
 ```
 
 ### Moodboard / Reference Images
 
-Use moodboard (also known as "shuffle") to provide reference images that influence the generation. This is particularly useful with models like Qwen Image Edit:
+Use moodboard (also known as "shuffle") to provide reference images that influence the generation. This is particularly useful with models like Qwen Image Edit. Both `DrawThingsClient` and `DrawThingsService` support hints:
 
 ```swift
 // Single reference image
 let referenceImage = NSImage(named: "style_reference.jpg")!
-let referenceData = try ImageHelpers.nsImageToDTTensor(referenceImage, forceRGB: true)
+let referenceData = try ImageHelpers.imageToDTTensor(referenceImage, forceRGB: true)
 
 var tensorAndWeight = TensorAndWeight()
 tensorAndWeight.tensor = referenceData
@@ -405,7 +449,15 @@ var hint = HintProto()
 hint.hintType = "shuffle"  // Use "shuffle" for moodboard/reference images
 hint.tensors = [tensorAndWeight]
 
-let images = try await service.generateImage(
+// Using DrawThingsClient (high-level)
+let images = try await client.generateImage(
+    prompt: "A woman wearing a blue dress",
+    configuration: config,
+    hints: [hint]
+)
+
+// Using DrawThingsService (low-level)
+let resultData = try await service.generateImage(
     prompt: "A woman wearing a blue dress",
     negativePrompt: "",
     configuration: configData,
@@ -426,7 +478,7 @@ let referenceImages = [
 ]
 
 for refImage in referenceImages {
-    let imageData = try ImageHelpers.nsImageToDTTensor(refImage, forceRGB: true)
+    let imageData = try ImageHelpers.imageToDTTensor(refImage, forceRGB: true)
 
     var tensorAndWeight = TensorAndWeight()
     tensorAndWeight.tensor = imageData
@@ -447,7 +499,7 @@ let images = try await service.generateImage(
 )
 ```
 
-**Note:** The moodboard feature works best with models that are designed to use reference images.
+**Note:** The moodboard feature works best with models that are designed to use reference images. See also the [HintBuilder](#hintbuilder) section below for a simpler way to construct hints.
 
 ### ControlNet
 
@@ -474,7 +526,7 @@ let config = DrawThingsConfiguration(
 
 // Prepare the control image (e.g., a face for PuLID)
 let controlImage = NSImage(named: "reference_face.jpg")!
-let controlImageData = try ImageHelpers.nsImageToDTTensor(controlImage, forceRGB: true)
+let controlImageData = try ImageHelpers.imageToDTTensor(controlImage, forceRGB: true)
 
 var tensorAndWeight = TensorAndWeight()
 tensorAndWeight.tensor = controlImageData
@@ -510,6 +562,71 @@ let images = try await service.generateImage(
 - **Canny**: Edge-based control
 - **Pose**: Human pose control (OpenPose)
 - **Scribble**: Sketch-based control
+
+### HintBuilder
+
+The `HintBuilder` class provides a convenient fluent API for constructing hints without manually creating `HintProto` and `TensorAndWeight` objects. It accepts raw image data (PNG/JPEG) and handles DTTensor conversion automatically.
+
+```swift
+// Single moodboard image
+let imageData = try Data(contentsOf: imageURL)
+let hints = HintBuilder()
+    .addMoodboardImage(imageData, weight: 1.0)
+    .build()
+
+let images = try await client.generateImage(
+    prompt: "A woman wearing a blue dress",
+    configuration: config,
+    hints: hints
+)
+```
+
+Multiple images and different hint types can be combined:
+
+```swift
+let refData = try Data(contentsOf: referenceURL)
+let depthData = try Data(contentsOf: depthMapURL)
+let edgeData = try Data(contentsOf: cannyURL)
+
+let hints = HintBuilder()
+    .addMoodboardImage(refData)
+    .addDepthMap(depthData, weight: 0.8)
+    .addCannyEdges(edgeData, weight: 0.5)
+    .build()
+```
+
+Multiple moodboard images at once:
+
+```swift
+let imageFiles = [image1Data, image2Data, image3Data]
+let hints = HintBuilder()
+    .addMoodboardImages(imageFiles, weight: 1.0)
+    .build()
+```
+
+**Available typed methods:**
+
+| Method | Hint Type | Use Case |
+|--------|-----------|----------|
+| `addMoodboardImage(_:weight:)` | `shuffle` | Reference/style images |
+| `addMoodboardImages(_:weight:)` | `shuffle` | Multiple reference images |
+| `addDepthMap(_:weight:)` | `depth` | Depth-based composition control |
+| `addPose(_:weight:)` | `pose` | Human pose control (OpenPose) |
+| `addCannyEdges(_:weight:)` | `canny` | Edge-based control |
+| `addScribble(_:weight:)` | `scribble` | Sketch-based control |
+| `addColorReference(_:weight:)` | `color` | Color palette control |
+| `addLineArt(_:weight:)` | `lineart` | Line art control |
+
+For hint types not covered by the typed methods, use `addHint(type:imageData:weight:)` with either a `HintType` enum value or a custom string:
+
+```swift
+let hints = HintBuilder()
+    .addHint(type: .tile, imageData: tileData)
+    .addHint(type: "custom_type", imageData: customData)
+    .build()
+```
+
+**Available hint types** (`HintType` enum): `shuffle`, `depth`, `pose`, `canny`, `scribble`, `color`, `lineart`, `softedge`, `seg`, `inpaint`, `ip2p`, `mlsd`, `tile`, `blur`, `lowquality`, `gray`, `custom`
 
 ### Using LoRAs
 
@@ -669,6 +786,10 @@ let tensorData = try ImageHelpers.imageToDTTensor(image, forceRGB: true)
 // Convert from DTTensor
 let resultImage = try ImageHelpers.dtTensorToImage(tensorData)
 
+// Save to file (PNG or JPEG)
+try ImageHelpers.saveImage(image, to: outputURL, format: .png)
+try ImageHelpers.saveImage(image, to: jpegURL, format: .jpeg, jpegQuality: 0.85)
+
 // Other cross-platform utilities
 let resized = ImageHelpers.resizeImage(image, to: CGSize(width: 512, height: 512))
 let scaled = ImageHelpers.scaleImageToCanvas(image, canvasWidth: 1024, canvasHeight: 1024, backgroundColor: nil)
@@ -688,9 +809,11 @@ For backward compatibility, the following deprecated methods are still available
 
 DrawThingsClient is built on top of:
 
-- **gRPC Swift 2**: Modern gRPC client with async/await support
+- **gRPC Swift**: Modern gRPC client with async/await support
 - **SwiftProtobuf**: Type-safe protocol buffer implementation
 - **SwiftNIO**: High-performance networking
+- **FlatBuffers**: Configuration serialization
+- **fpzip**: Floating-point tensor decompression (via swift-fpzip-support)
 
 The framework provides two main interfaces:
 
@@ -736,15 +859,16 @@ swift run
 
 - `init(address: String, useTLS: Bool = true)`: Create a new client
 - `connect() async`: Connect to the Draw Things server
-- `generateImage(...)` async: Generate images with progress tracking
+- `generateImage(prompt:negativePrompt:configuration:image:mask:hints:sharedSecret:) async throws -> [PlatformImage]`: Generate images with progress tracking
+- `generateImageAndAudio(prompt:negativePrompt:configuration:image:mask:sharedSecret:) async throws -> GenerationOutput`: Generate images and audio (LTX-2)
 - `@Published var isConnected`: Connection status
 - `@Published var currentProgress`: Current generation progress
 
 ### DrawThingsService (Low-level)
 
 - `echo(name:) async throws -> EchoReply`: Server health check
-- `generateImage(...) async throws -> [Data]`: Generate images
-- `checkFilesExist(...) async throws -> FileExistenceResponse`: Check file existence
+- `generateImage(prompt:negativePrompt:configuration:image:mask:hints:contents:override:scaleFactor:sharedSecret:progressHandler:previewHandler:audioHandler:) async throws -> [Data]`: Generate images with full control
+- `checkFilesExist(files:filesWithHash:) async throws -> FileExistenceResponse`: Check file existence
 
 ### Configuration
 

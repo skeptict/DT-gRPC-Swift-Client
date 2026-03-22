@@ -9,6 +9,7 @@
 //  See LICENSE file in the project root for license information.
 //
 
+import AVFoundation
 import Foundation
 import SwiftUI
 import Combine
@@ -18,6 +19,11 @@ import AppKit
 #else
 import UIKit
 #endif
+
+public struct GenerationOutput: Sendable {
+    public let images: [PlatformImage]
+    public let audio: [AVAudioPCMBuffer]
+}
 
 @MainActor
 public class DrawThingsClient: ObservableObject {
@@ -47,9 +53,62 @@ public class DrawThingsClient: ObservableObject {
         negativePrompt: String = "",
         configuration: DrawThingsConfiguration = DrawThingsConfiguration(),
         image: PlatformImage? = nil,
-        mask: PlatformImage? = nil
+        mask: PlatformImage? = nil,
+        hints: [HintProto] = [],
+        sharedSecret: String? = nil
     ) async throws -> [PlatformImage] {
+        let resultData = try await callService(
+            prompt: prompt,
+            negativePrompt: negativePrompt,
+            configuration: configuration,
+            image: image,
+            mask: mask,
+            hints: hints,
+            sharedSecret: sharedSecret
+        )
+        let modelFamily = LatentModelFamily.detect(from: configuration.model)
+        return try resultData.map { try ImageHelpers.dtTensorToImage($0, modelFamily: modelFamily) }
+    }
 
+    public func generateImageAndAudio(
+        prompt: String,
+        negativePrompt: String = "",
+        configuration: DrawThingsConfiguration = DrawThingsConfiguration(),
+        image: PlatformImage? = nil,
+        mask: PlatformImage? = nil,
+        sharedSecret: String? = nil
+    ) async throws -> GenerationOutput {
+        var audioBuffers: [AVAudioPCMBuffer] = []
+
+        let resultData = try await callService(
+            prompt: prompt,
+            negativePrompt: negativePrompt,
+            configuration: configuration,
+            image: image,
+            mask: mask,
+            sharedSecret: sharedSecret,
+            audioHandler: { audioData in
+                if let buffer = try? AudioHelpers.ccvTensorToAudioBuffer(audioData) {
+                    audioBuffers.append(buffer)
+                }
+            }
+        )
+
+        let modelFamily = LatentModelFamily.detect(from: configuration.model)
+        let images = try resultData.map { try ImageHelpers.dtTensorToImage($0, modelFamily: modelFamily) }
+        return GenerationOutput(images: images, audio: audioBuffers)
+    }
+
+    private func callService(
+        prompt: String,
+        negativePrompt: String,
+        configuration: DrawThingsConfiguration,
+        image: PlatformImage?,
+        mask: PlatformImage?,
+        hints: [HintProto] = [],
+        sharedSecret: String? = nil,
+        audioHandler: @escaping (Data) async -> Void = { _ in }
+    ) async throws -> [Data] {
         currentProgress = ImageGenerationProgress()
 
         let configData = try configuration.toFlatBufferData()
@@ -57,7 +116,6 @@ public class DrawThingsClient: ObservableObject {
         var imageData: Data?
         var maskData: Data?
 
-        // Convert images to DTTensor format (required by Draw Things server)
         if let image = image {
             imageData = try ImageHelpers.imageToDTTensor(image, forceRGB: true)
         }
@@ -66,26 +124,24 @@ public class DrawThingsClient: ObservableObject {
             maskData = try ImageHelpers.imageToDTTensor(mask, forceRGB: true)
         }
 
-        let resultData = try await service.generateImage(
+        let result = try await service.generateImage(
             prompt: prompt,
             negativePrompt: negativePrompt,
             configuration: configData,
             image: imageData,
             mask: maskData,
+            hints: hints,
+            sharedSecret: sharedSecret,
             progressHandler: { [weak self] signpost in
                 await MainActor.run {
                     self?.updateProgress(signpost)
                 }
-            }
+            },
+            audioHandler: audioHandler
         )
 
         currentProgress = nil
-
-        // Detect model family for correct latent-to-RGB conversion
-        let modelFamily = LatentModelFamily.detect(from: configuration.model)
-
-        // Convert DTTensor results back to PlatformImage
-        return try resultData.map { try ImageHelpers.dtTensorToImage($0, modelFamily: modelFamily) }
+        return result
     }
     
     private func updateProgress(_ signpost: ImageGenerationSignpostProto?) {

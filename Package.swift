@@ -5,8 +5,7 @@ let package = Package(
     name: "DrawThingsClient",
     platforms: [
         .macOS(.v14),
-        .iOS(.v17),
-        .tvOS(.v17),
+        .iOS(.v17)
     ],
     products: [
         .library(
@@ -21,16 +20,44 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "CFpzip",
+            path: "Sources/CFpzip",
+            exclude: [
+                "LICENSE",
+                "src/CMakeLists.txt",
+                "src/Makefile",
+                "src/fpe.inl",
+                "src/pccodec.inl",
+                "src/pcdecoder.inl",
+                "src/pcencoder.inl",
+                "src/pcmap.inl",
+                "src/rcdecoder.inl",
+                "src/rcencoder.inl",
+                "src/rcqsmodel.inl",
+            ],
+            sources: ["src"],
+            publicHeadersPath: "include",
+            cxxSettings: [
+                .define("FPZIP_FP", to: "FPZIP_FP_FAST"),
+                .define("FPZIP_BLOCK_SIZE", to: "0x1000"),
+                .headerSearchPath("src"),
+                .headerSearchPath("include"),
+                .unsafeFlags(["-std=c++98", "-fPIC"]),
+            ]
+        ),
+        .target(
             name: "DrawThingsClient",
             dependencies: [
                 .product(name: "GRPC", package: "grpc-swift"),
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
                 .product(name: "FlatBuffers", package: "flatbuffers"),
+                "CFpzip",
             ]
         ),
         .testTarget(
             name: "DrawThingsClientTests",
             dependencies: ["DrawThingsClient"]
         ),
-    ]
+    ],
+    cxxLanguageStandard: .cxx11
 )
