@@ -144,7 +144,12 @@ public actor DrawThingsService {
                     }
                 }
             }
-            $0.contents = casContents
+            // Deduplicate contents by SHA256 hash
+            var seenHashes = Set<Data>()
+            $0.contents = casContents.filter { entry in
+                let hash = Data(SHA256.hash(data: entry))
+                return seenHashes.insert(hash).inserted
+            }
             
             if let override = override {
                 $0.override = override
