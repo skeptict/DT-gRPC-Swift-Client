@@ -75,6 +75,7 @@ public class DrawThingsClient: ObservableObject {
         configuration: DrawThingsConfiguration = DrawThingsConfiguration(),
         image: PlatformImage? = nil,
         mask: PlatformImage? = nil,
+        hints: [HintProto] = [],
         sharedSecret: String? = nil
     ) async throws -> GenerationOutput {
         var audioBuffers: [AVAudioPCMBuffer] = []
@@ -85,6 +86,7 @@ public class DrawThingsClient: ObservableObject {
             configuration: configuration,
             image: image,
             mask: mask,
+            hints: hints,
             sharedSecret: sharedSecret,
             audioHandler: { audioData in
                 if let buffer = try? AudioHelpers.ccvTensorToAudioBuffer(audioData) {
