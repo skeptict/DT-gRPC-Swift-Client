@@ -29,4 +29,43 @@ final class DrawThingsClientTests: XCTestCase {
         XCTAssertEqual(GenerationStage.sampling(step: 5).description, "Generating image (step 5)...")
         XCTAssertEqual(GenerationStage.imageDecoding.description, "Decoding generated image...")
     }
+
+    func testLatentModelFamilyDetection() {
+        // SD 1.x/2.x/SVD must be distinguished from SDXL (different 4-channel coefficients).
+        XCTAssertEqual(LatentModelFamily.detect(from: "v1"), .sd1)
+        XCTAssertEqual(LatentModelFamily.detect(from: "v2"), .sd1)
+        XCTAssertEqual(LatentModelFamily.detect(from: "svd_xt_1.1.safetensors"), .sd1)
+        XCTAssertEqual(LatentModelFamily.detect(from: "sd_xl_base_1.0.safetensors"), .sdxl)
+        XCTAssertEqual(LatentModelFamily.detect(from: "sdxlBase"), .sdxl)
+        XCTAssertEqual(LatentModelFamily.detect(from: "pixart"), .sdxl)
+
+        // HiDream-O1 (patch decode) must not be confused with HiDream-I1 (Flux coefficients).
+        XCTAssertEqual(LatentModelFamily.detect(from: "hidreamo1"), .hiDreamO1)
+        XCTAssertEqual(LatentModelFamily.detect(from: "hidream_o1"), .hiDreamO1)
+        XCTAssertEqual(LatentModelFamily.detect(from: "hidreami1"), .flux)
+
+        // New models reusing existing coefficient families.
+        XCTAssertEqual(LatentModelFamily.detect(from: "cosmos2_5_2b"), .qwen)
+        XCTAssertEqual(LatentModelFamily.detect(from: "ernieImage"), .flux2)
+        XCTAssertEqual(LatentModelFamily.detect(from: "seedvr2_3b"), .flux)
+
+        // Newly recognized older families.
+        XCTAssertEqual(LatentModelFamily.detect(from: "kandinsky21"), .kandinsky)
+        XCTAssertEqual(LatentModelFamily.detect(from: "wurstchenStageC"), .wurstchen)
+
+        // Regression checks on existing routing.
+        XCTAssertEqual(LatentModelFamily.detect(from: "qwenImage"), .qwen)
+        XCTAssertEqual(LatentModelFamily.detect(from: "flux1"), .flux)
+        XCTAssertEqual(LatentModelFamily.detect(from: "wan22_5b"), .wan22)
+        XCTAssertEqual(LatentModelFamily.detect(from: "totally-unknown-model"), .unknown)
+    }
+
+    func testLatentModelFamilyChannels() {
+        XCTAssertEqual(LatentModelFamily.sd1.latentChannels, 4)
+        XCTAssertEqual(LatentModelFamily.kandinsky.latentChannels, 4)
+        XCTAssertEqual(LatentModelFamily.wurstchen.latentChannels, 4)
+        XCTAssertEqual(LatentModelFamily.flux2.latentChannels, 32)
+        XCTAssertEqual(LatentModelFamily.wan22.latentChannels, 48)
+        XCTAssertEqual(LatentModelFamily.hiDreamO1.latentChannels, 3 * 32 * 32)
+    }
 }

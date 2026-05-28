@@ -54,6 +54,12 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
     case ltx2
     /// LTX-2.3 models (16-channel latent, TAESD-only preview)
     case ltx23
+    /// HiDream-O1 (patch-packed latent: 3 × 32 × 32 channels, patch-based preview decode)
+    case hiDreamO1
+    /// Kandinsky 2.1 (4-channel latent, OKLab color space)
+    case kandinsky
+    /// Würstchen / Stable Cascade Stage B/C (3- or 4-channel latent)
+    case wurstchen
     /// Unknown model - will use default coefficients
     case unknown
 
@@ -64,32 +70,53 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
     public static func detect(from modelNameOrVersion: String) -> LatentModelFamily {
         let lowercased = modelNameOrVersion.lowercased()
 
-        // First check for exact version strings from Draw Things (case-insensitive)
-        // These come from CheckpointModel.version field
+        // First check for exact version identifiers from Draw Things (case-insensitive).
+        // These come from CheckpointModel.version and mirror the upstream ModelVersion enum
+        // (matched both as lowercased Swift case names and as raw string values).
+        // Each entry routes to the LatentModelFamily whose coefficients upstream uses for it.
         switch lowercased {
-        case "qwenimage":
+        case "qwenimage", "qwen_image":
             return .qwen
-        case "zimage":
+        case "cosmos2_5_2b", "cosmos2.5_2b":
+            // Cosmos 2.5 shares the Wan 2.1 / Qwen 16-channel coefficients upstream.
+            return .qwen
+        case "zimage", "z_image":
             return .zImage
         case "flux2", "flux2_9b", "flux2_4b":
             return .flux2
+        case "ernieimage", "ernie_image":
+            // Ernie Image uses the 32-channel Flux 2 coefficients upstream.
+            return .flux2
         case "ltx2":
             return .ltx2
-        case "ltx2_3":
+        case "ltx2_3", "ltx2.3":
             return .ltx23
-        case "flux1", "hidreami1":
+        case "flux1", "hidreami1", "hidream_i1":
             return .flux
-        case "wan21_1_3b", "wan21_14b":
+        case "seedvr2_3b", "seedvr2_7b":
+            // SeedVR2 uses the 16-channel Flux coefficients upstream.
+            return .flux
+        case "hidreamo1", "hidream_o1":
+            return .hiDreamO1
+        case "wan21_1_3b", "wan21_14b", "wan_v2.1_1.3b", "wan_v2.1_14b":
             return .wan21
-        case "wan22_5b":
+        case "wan22_5b", "wan_v2.2_5b":
             return .wan22
-        case "hunyuanvideo":
+        case "hunyuanvideo", "hunyuan_video":
             return .hunyuanVideo
-        case "sd3", "sd3large":
+        case "sd3", "sd3large", "sd3_large":
             return .sd3
-        case "sdxlbase", "sdxlrefiner", "ssd1b":
+        case "sdxlbase", "sdxlrefiner", "ssd1b", "sdxl_base_v0.9", "sdxl_refiner_v0.9", "ssd_1b":
             return .sdxl
-        case "v1", "v2":
+        case "pixart", "auraflow":
+            // Pixart / AuraFlow use the 4-channel SDXL coefficients upstream.
+            return .sdxl
+        case "kandinsky21", "kandinsky2.1":
+            return .kandinsky
+        case "wurstchenstagec", "wurstchenstageb", "wurstchen_v3.0_stage_c", "wurstchen_v3.0_stage_b":
+            return .wurstchen
+        case "svdi2v", "svd_i2v", "v1", "v2":
+            // v1 / v2 / SVD share the distinct 4-channel coefficients upstream.
             return .sd1
         default:
             break
@@ -99,11 +126,21 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
         if lowercased.contains("flux2") {
             return .flux2
         }
+        // HiDream-O1 must be checked before the generic hidream -> .flux rule.
+        if lowercased.contains("hidreamo1") || lowercased.contains("hidream_o1") || lowercased.contains("hidream-o1") || (lowercased.contains("hidream") && lowercased.contains("o1")) {
+            return .hiDreamO1
+        }
         if lowercased.contains("ltx2.3") || lowercased.contains("ltx-2.3") || lowercased.contains("ltx_2.3") || lowercased.contains("ltx_2_3") || lowercased.contains("ltx23") {
             return .ltx23
         }
         if lowercased.contains("ltx2") || lowercased.contains("ltx-2") || lowercased.contains("ltx_2") {
             return .ltx2
+        }
+        if lowercased.contains("ernie") {
+            return .flux2
+        }
+        if lowercased.contains("seedvr") {
+            return .flux
         }
         if lowercased.contains("flux") || lowercased.contains("hidream") {
             return .flux
@@ -112,6 +149,9 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
             return .zImage
         }
         if lowercased.contains("qwen") {
+            return .qwen
+        }
+        if lowercased.contains("cosmos") {
             return .qwen
         }
         if lowercased.contains("wan") {
@@ -124,11 +164,21 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
         if lowercased.contains("hunyuan") && lowercased.contains("video") {
             return .hunyuanVideo
         }
+        if lowercased.contains("kandinsky") {
+            return .kandinsky
+        }
+        if lowercased.contains("wurstchen") || lowercased.contains("cascade") {
+            return .wurstchen
+        }
         if lowercased.contains("sd3") || lowercased.contains("sd_3") || lowercased.contains("stable-diffusion-3") {
             return .sd3
         }
-        if lowercased.contains("sdxl") || lowercased.contains("sd_xl") || lowercased.contains("xl_base") || lowercased.contains("xl_refiner") {
+        if lowercased.contains("sdxl") || lowercased.contains("sd_xl") || lowercased.contains("xl_base") || lowercased.contains("xl_refiner") || lowercased.contains("pixart") || lowercased.contains("auraflow") {
             return .sdxl
+        }
+        // SVD shares the v1/v2 4-channel coefficients; check before the generic sd_ rule.
+        if lowercased.contains("svd") {
+            return .sd1
         }
         if lowercased.contains("sd_") || lowercased.contains("v1-") || lowercased.contains("v2-") {
             return .sd1
@@ -139,9 +189,12 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
     }
 
     /// The number of latent channels for this model family.
+    ///
+    /// For `.hiDreamO1` this is the patch-packed channel count (3 × 32 × 32 = 3072),
+    /// not a conventional latent channel count — its preview uses a patch-based decode.
     public var latentChannels: Int {
         switch self {
-        case .sd1, .sdxl:
+        case .sd1, .sdxl, .kandinsky, .wurstchen:
             return 4
         case .sd3, .flux, .hunyuanVideo, .qwen, .zImage, .wan21, .ltx2, .ltx23:
             return 16
@@ -149,6 +202,8 @@ public enum LatentModelFamily: String, Sendable, CaseIterable {
             return 32
         case .wan22:
             return 48
+        case .hiDreamO1:
+            return 3 * 32 * 32
         case .unknown:
             return 16  // Default assumption for unknown
         }
@@ -549,6 +604,14 @@ public struct ImageHelpers {
             }
         }
 
+        // HiDream-O1 uses a patch-packed latent (3 × 32 × 32 channels) decoded into an
+        // image 32× larger per side, not a coefficient matrix. Handle it before the
+        // standard channel guard, keyed on the family or the distinctive channel count.
+        if family == .hiDreamO1 || channels == 3 * 32 * 32 {
+            DrawThingsClientLogger.debug("dtTensorToImage: using HiDream-O1 patch-based conversion")
+            return try hiDreamO1PatchToImage(tensorData, imageWidth: width, imageHeight: height, channels: channels)
+        }
+
         guard channels == 3 || channels == 4 || channels == 16 || channels == 32 || channels == 48 else {
             DrawThingsClientLogger.error("dtTensorToImage: unsupported channel count \(channels)")
             throw ImageError.conversionFailed
@@ -608,9 +671,23 @@ public struct ImageHelpers {
                         convertFluxToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
                     }
                 } else if channels == 4 {
-                    DrawThingsClientLogger.debug("dtTensorToImage: using 4-channel SDXL conversion")
-                    // 4-channel latent space to RGB (SDXL coefficients)
-                    convert4ChannelToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
+                    // 4-channel latent space to RGB - coefficients differ by family.
+                    switch family {
+                    case .sd1:
+                        // SD 1.x / 2.x / SVD use a distinct matrix from SDXL.
+                        DrawThingsClientLogger.debug("dtTensorToImage: using 4-channel SD1 conversion")
+                        convertSD1ToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
+                    case .kandinsky:
+                        DrawThingsClientLogger.debug("dtTensorToImage: using 4-channel Kandinsky (OKLab) conversion")
+                        convertKandinskyToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
+                    case .wurstchen:
+                        DrawThingsClientLogger.debug("dtTensorToImage: using 4-channel Würstchen conversion")
+                        convertWurstchenToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
+                    default:
+                        // SDXL / SSD-1B / PixArt / AuraFlow / unknown.
+                        DrawThingsClientLogger.debug("dtTensorToImage: using 4-channel SDXL conversion (family=\(family))")
+                        convert4ChannelToRGB(float16Ptr: float16Ptr, uint8Ptr: uint8Ptr, pixelCount: width * height)
+                    }
                 } else {
                     // 3-channel RGB: Convert from [-1, 1] to [0, 255]
                     if isNHWC {
@@ -736,6 +813,152 @@ public struct ImageHelpers {
             uint8Ptr[i * 3 + 1] = UInt8(clamping: Int(g))
             uint8Ptr[i * 3 + 2] = UInt8(clamping: Int(b))
         }
+    }
+
+    /// Convert 4-channel SD 1.x / 2.x / SVD latent to RGB.
+    ///
+    /// These use a different matrix than SDXL (upstream `v1`/`v2`/`svd_i2v` case).
+    private static func convertSD1ToRGB(float16Ptr: UnsafePointer<UInt16>, uint8Ptr: UnsafeMutablePointer<UInt8>, pixelCount: Int) {
+        for i in 0..<pixelCount {
+            let base = i * 4
+            let v0 = f16ToFloat(float16Ptr, base + 0)
+            let v1 = f16ToFloat(float16Ptr, base + 1)
+            let v2 = f16ToFloat(float16Ptr, base + 2)
+            let v3 = f16ToFloat(float16Ptr, base + 3)
+
+            let r: Float = 49.5210 * v0 + 29.0283 * v1 - 23.9673 * v2 - 39.4981 * v3 + 99.9368
+            let g: Float = 41.1373 * v0 + 42.4951 * v1 + 24.7349 * v2 - 50.8279 * v3 + 99.8421
+            let b: Float = 40.2919 * v0 + 18.9304 * v1 + 30.0236 * v2 - 81.9976 * v3 + 99.5384
+
+            uint8Ptr[i * 3 + 0] = UInt8(clamping: Int(r.isFinite ? r : 0))
+            uint8Ptr[i * 3 + 1] = UInt8(clamping: Int(g.isFinite ? g : 0))
+            uint8Ptr[i * 3 + 2] = UInt8(clamping: Int(b.isFinite ? b : 0))
+        }
+    }
+
+    /// Convert 4-channel Würstchen / Stable Cascade latent to RGB.
+    private static func convertWurstchenToRGB(float16Ptr: UnsafePointer<UInt16>, uint8Ptr: UnsafeMutablePointer<UInt8>, pixelCount: Int) {
+        for i in 0..<pixelCount {
+            let base = i * 4
+            let v0 = f16ToFloat(float16Ptr, base + 0)
+            let v1 = f16ToFloat(float16Ptr, base + 1)
+            let v2 = f16ToFloat(float16Ptr, base + 2)
+            let v3 = f16ToFloat(float16Ptr, base + 3)
+
+            let r: Float = 10.175 * v0 - 20.807 * v1 - 27.834 * v2 - 2.0577 * v3 + 143.39
+            let g: Float = 21.07 * v0 - 4.3022 * v1 - 11.258 * v2 - 18.8 * v3 + 131.53
+            let b: Float = 7.8454 * v0 - 2.3713 * v1 - 0.45565 * v2 - 41.648 * v3 + 120.76
+
+            uint8Ptr[i * 3 + 0] = UInt8(clamping: Int(r.isFinite ? r : 0))
+            uint8Ptr[i * 3 + 1] = UInt8(clamping: Int(g.isFinite ? g : 0))
+            uint8Ptr[i * 3 + 2] = UInt8(clamping: Int(b.isFinite ? b : 0))
+        }
+    }
+
+    /// Convert 4-channel Kandinsky 2.1 latent to RGB via the OKLab color space.
+    private static func convertKandinskyToRGB(float16Ptr: UnsafePointer<UInt16>, uint8Ptr: UnsafeMutablePointer<UInt8>, pixelCount: Int) {
+        for i in 0..<pixelCount {
+            let base = i * 4
+            let v0 = f16ToFloat(float16Ptr, base + 0)
+            let v1 = f16ToFloat(float16Ptr, base + 1)
+            let v2 = f16ToFloat(float16Ptr, base + 2)
+            let v3 = f16ToFloat(float16Ptr, base + 3)
+
+            let L: Float = -0.051509 * v0 + 0.039954 * v1 + 0.039893 * v2 - 0.087302 * v3 + 0.88591
+            let a: Float = -0.028686 * v0 - 0.0061331 * v1 - 0.016837 * v2 + 0.016139 * v3 + 0.0018263
+            let bLab: Float = -0.0068242 * v0 + 0.0068562 * v1 - 0.03415 * v2 + 0.00056286 * v3 + 0.0096209
+
+            var (sr, sg, sb) = okLabToLinearSRGB(L: L, a: a, b: bLab)
+            sr = linearSRGBToSRGB(sr) * 255
+            sg = linearSRGBToSRGB(sg) * 255
+            sb = linearSRGBToSRGB(sb) * 255
+
+            uint8Ptr[i * 3 + 0] = UInt8(clamping: Int(sr.isFinite ? sr : 0))
+            uint8Ptr[i * 3 + 1] = UInt8(clamping: Int(sg.isFinite ? sg : 0))
+            uint8Ptr[i * 3 + 2] = UInt8(clamping: Int(sb.isFinite ? sb : 0))
+        }
+    }
+
+    /// Convert OKLab to linear sRGB. Ports the upstream `OKlabToLinearsRGB`.
+    @inline(__always)
+    private static func okLabToLinearSRGB(L: Float, a: Float, b: Float) -> (Float, Float, Float) {
+        let l_ = L + 0.3963377774 * a + 0.2158037573 * b
+        let m_ = L - 0.1055613458 * a - 0.0638541728 * b
+        let s_ = L - 0.0894841775 * a - 1.2914855480 * b
+        let l = l_ * l_ * l_
+        let m = m_ * m_ * m_
+        let s = s_ * s_ * s_
+        return (
+            +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+            -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+            -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
+        )
+    }
+
+    /// Convert linear sRGB to sRGB. Ports the upstream `linearsRGBTosRGB`.
+    @inline(__always)
+    private static func linearSRGBToSRGB(_ x: Float) -> Float {
+        if x >= 0.04045 {
+            return pow((x + 0.055) / (1 + 0.055), 2.4)
+        } else {
+            return x / 12.92
+        }
+    }
+
+    /// Convert a HiDream-O1 patch-packed latent into an RGB image.
+    ///
+    /// HiDream-O1 packs each 32×32 output patch into the channel dimension
+    /// (channels = 3 × 32 × 32 = 3072), so the decoded image is 32× larger per side.
+    /// Ports the upstream patch-unpacking preview path.
+    private static func hiDreamO1PatchToImage(_ tensorData: Data, imageWidth: Int, imageHeight: Int, channels: Int) throws -> PlatformImage {
+        let patchSize = 32
+        guard channels == 3 * patchSize * patchSize else {
+            DrawThingsClientLogger.error("hiDreamO1PatchToImage: unexpected channel count \(channels), expected \(3 * patchSize * patchSize)")
+            throw ImageError.conversionFailed
+        }
+
+        let pixelDataOffset = 68
+        let expectedDataSize = pixelDataOffset + (imageWidth * imageHeight * channels * 2)
+        guard tensorData.count >= expectedDataSize else {
+            throw ImageError.invalidData
+        }
+
+        let outputWidth = imageWidth * patchSize
+        let outputHeight = imageHeight * patchSize
+        let patchArea = patchSize * patchSize
+        var rgbData = Data(count: outputWidth * outputHeight * 3)
+
+        tensorData.withUnsafeBytes { (rawPtr: UnsafeRawBufferPointer) in
+            let basePtr = rawPtr.baseAddress!.advanced(by: pixelDataOffset)
+            let fp16 = basePtr.assumingMemoryBound(to: UInt16.self)
+
+            rgbData.withUnsafeMutableBytes { (outPtr: UnsafeMutableRawBufferPointer) in
+                let out = outPtr.baseAddress!.assumingMemoryBound(to: UInt8.self)
+
+                for y in 0..<outputHeight {
+                    let patchY = y / patchSize
+                    let patchYOffset = y % patchSize
+                    for x in 0..<outputWidth {
+                        let patchX = x / patchSize
+                        let patchXOffset = x % patchSize
+                        let patchPixelOffset = patchYOffset * patchSize + patchXOffset
+                        let patchOffset = (patchY * imageWidth + patchX) * channels + patchPixelOffset
+
+                        let rF = (f16ToFloat(fp16, patchOffset) + 1) * 127.5
+                        let gF = (f16ToFloat(fp16, patchOffset + patchArea) + 1) * 127.5
+                        let bF = (f16ToFloat(fp16, patchOffset + patchArea * 2) + 1) * 127.5
+
+                        let o = (y * outputWidth + x) * 3
+                        out[o + 0] = UInt8(clamping: Int(rF.isFinite ? rF : 0))
+                        out[o + 1] = UInt8(clamping: Int(gF.isFinite ? gF : 0))
+                        out[o + 2] = UInt8(clamping: Int(bF.isFinite ? bF : 0))
+                    }
+                }
+            }
+        }
+
+        DrawThingsClientLogger.debug("hiDreamO1PatchToImage: decoded \(imageWidth)x\(imageHeight) patches -> \(outputWidth)x\(outputHeight) image")
+        return try createImageFromRGBData(rgbData, width: outputWidth, height: outputHeight)
     }
 
     /// Convert 3-channel RGB from [-1, 1] to [0, 255] (NHWC / interleaved layout)
