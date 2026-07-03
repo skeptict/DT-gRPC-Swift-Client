@@ -37,9 +37,9 @@ public class DrawThingsClient: ObservableObject {
         self.service = try DrawThingsService(address: address, useTLS: useTLS)
     }
     
-    public func connect() async {
+    public func connect(sharedSecret: String? = nil) async {
         do {
-            _ = try await service.echo()
+            _ = try await service.echo(sharedSecret: sharedSecret)
             isConnected = true
             lastError = nil
         } catch {
